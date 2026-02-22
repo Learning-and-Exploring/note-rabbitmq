@@ -29,6 +29,7 @@ graph LR
     D -->|Consume| E(Note Service)
     E -->|Execute Handler| E_DB[(Note DB)]
 ```
+```
 app/
 │
 ├── docker-compose.yml
