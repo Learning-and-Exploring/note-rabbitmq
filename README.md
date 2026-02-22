@@ -1,9 +1,9 @@
 # Folder Structure of Even Driven Architecture 
 
-[![Node.js](https://img.shields.io/badge/Node.js-v18-green)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-v5-blue)](https://www.typescriptlang.org/)
-[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED)](https://www.docker.com/)
-[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-Event%20Bus-orange)](https://www.rabbitmq.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
 
 A scalable, event-driven microservices architecture built with **Node.js** and **TypeScript**. This project demonstrates asynchronous communication between services using **RabbitMQ** to decouple business logic and ensure high availability.
 
