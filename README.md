@@ -1,10 +1,5 @@
 # Folder Structure of Even Driven Architecture 
 
-[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
-
 
 <h3>🛠 Tech Stack ⚛</h3>
 
@@ -51,12 +46,34 @@ The application is split into distinct domain services. Communication is handled
 
 ```mermaid
 graph LR
-    A[Client] -->|HTTP POST /users| B(User Service)
-    B -->|Persist to DB| B_DB[(User DB)]
-    B -->|Publish 'UserCreated'| C{RabbitMQ Exchange}
-    C -->|Route| D[User Queue]
-    D -->|Consume| E(Note Service)
-    E -->|Execute Handler| E_DB[(Note DB)]
+    %% Custom Styles
+    classDef client fill:#2b2d31,stroke:#5865f2,stroke-width:2px,color:#fff,rx:8,ry:8
+    classDef service fill:#339933,stroke:#236b23,stroke-width:2px,color:#fff,rx:8,ry:8
+    classDef db fill:#007ACC,stroke:#005999,stroke-width:2px,color:#fff,rx:8,ry:8
+    classDef broker fill:#FF6600,stroke:#cc5200,stroke-width:2px,color:#fff,rx:15,ry:15
+    classDef queue fill:#2496ED,stroke:#1a75c2,stroke-width:2px,color:#fff,rx:4,ry:4
+
+    %% Nodes
+    A[👤 Client]:::client
+    B(⚙️ User Service):::service
+    B_DB[(🗄️ User DB)]:::db
+    C{🐇 Exchange}:::broker
+    D[📨 User Queue]:::queue
+    E(⚙️ Note Service):::service
+    E_DB[(🗄️ Note DB)]:::db
+
+    %% Edges
+    A -->|HTTP POST| B
+    B -->|Persist| B_DB
+    B ==>|Publish Event| C
+    C -.->|Route| D
+    D ==>|Consume| E
+    E -->|Save| E_DB
+
+    %% Highlight the RabbitMQ Event Path
+    linkStyle 2 stroke:#FF6600,stroke-width:3px
+    linkStyle 3 stroke:#FF6600,stroke-width:2px,stroke-dasharray: 5 5
+    linkStyle 4 stroke:#FF6600,stroke-width:3px
 ```
 ```
 app/
