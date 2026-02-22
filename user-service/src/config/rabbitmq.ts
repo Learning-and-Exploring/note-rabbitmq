@@ -47,3 +47,4 @@ export async function closeRabbitMQ(): Promise<void> {
   await channel?.close();
   await connection?.close();
 }
+
