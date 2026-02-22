@@ -1,0 +1,32 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String   @default("Welcome Note")
+  content   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notes")
+}
+
+// Local shadow of User data — populated via RabbitMQ events, NOT a DB foreign key to user-service
+model SyncedUser {
+  id       String   @id // same UUID from user-service
+  name     String?
+  email    String
+  syncedAt DateTime @default(now()) @map("synced_at")
+
+  @@map("synced_users")
+}
