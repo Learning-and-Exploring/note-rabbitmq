@@ -83,65 +83,64 @@ graph LR
 
 
 ```
-app/
-│
-├── docker-compose.yml
-│
-├── user-service/
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
+app/.
+├──  api-gateway
+│   └── src
 │       ├── app.ts
-│       ├── server.ts
-│       │
-│       ├── config/
-│       │   ├── env.ts
-│       │   └── rabbitmq.ts
-│       │
-│       ├── modules/
-│       │   └── user/
-│       │       ├── user.controller.ts
-│       │       ├── user.service.ts
-│       │       ├── user.model.ts
-│       │       ├── user.routes.ts
-│       │       └── user.events.ts
-│       │
-│       ├── events/
-│       │   ├── publishers/
-│       │   │   └── user.publisher.ts
-│       │   └── types/
-│       │       └── user.events.types.ts
-│       │
-│       └── shared/
-│           ├── database.ts
-│           └── logger.ts
-│
-└── note-service/
+│       ├── middleware
+│       │   └── auth.middleware.ts
+│       └── routes
+│           ├── note.proxy.ts
+│           └── user.proxy.ts
+├── docker-compose.yml
+├── note-service
+│   ├── package.json
+│   ├── src
+│   │   ├── app.ts
+│   │   ├── config
+│   │   │   ├── env.ts
+│   │   │   └── rabbitmq.ts
+│   │   ├── events
+│   │   │   ├── consumers
+│   │   │   │   └── user.consumer.ts
+│   │   │   └── handlers
+│   │   │       └── user.event.handler.ts
+│   │   ├── modules
+│   │   │   └── note
+│   │   │       ├── note.controller.ts
+│   │   │       ├── note.model.ts
+│   │   │       ├── note.routes.ts
+│   │   │       └── note.service.ts
+│   │   ├── server.ts
+│   │   └── shared
+│   │       ├── database.ts
+│   │       └── logger.ts
+│   └── tsconfig.json
+├── README.md
+└── user-service
     ├── package.json
-    ├── tsconfig.json
-    └── src/
-        ├── app.ts
-        ├── server.ts
-        │
-        ├── config/
-        │   ├── env.ts
-        │   └── rabbitmq.ts
-        │
-        ├── modules/
-        │   └── note/
-        │       ├── note.controller.ts
-        │       ├── note.service.ts
-        │       ├── note.model.ts
-        │       └── note.routes.ts
-        │
-        ├── events/
-        │   ├── consumers/
-        │   │   └── user.consumer.ts
-        │   └── handlers/
-        │       └── user.event.handler.ts
-        │
-        └── shared/
-            ├── database.ts
-            └── logger.ts
+    ├── src
+    │   ├── app.ts
+    │   ├── config
+    │   │   ├── env.ts
+    │   │   └── rabbitmq.ts
+    │   ├── events
+    │   │   ├── publishers
+    │   │   │   └── user.publisher.ts
+    │   │   └── types
+    │   │       └── user.events.types.ts
+    │   ├── modules
+    │   │   └── user
+    │   │       ├── user.controller.ts
+    │   │       ├── user.events.ts
+    │   │       ├── user.model.ts
+    │   │       ├── user.routes.ts
+    │   │       └── user.service.ts
+    │   ├── server.ts
+    │   └── shared
+    │       ├── database.ts
+    │       └── logger.ts
+    └── tsconfig.json
+
 ```
 ---
