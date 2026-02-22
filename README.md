@@ -44,6 +44,10 @@ The application is split into distinct domain services. Communication is handled
 2.  **RabbitMQ**: Acts as the message broker, routing events to the appropriate queues.
 3.  **Note Service**: Manages user notes. It **consumes** user events to maintain data consistency (e.g., creating a default welcome note when a new user registers).
 
+
+
+
+
 ```mermaid
 graph LR
     %% Custom Styles
@@ -75,6 +79,10 @@ graph LR
     linkStyle 3 stroke:#FF6600,stroke-width:2px,stroke-dasharray: 5 5
     linkStyle 4 stroke:#FF6600,stroke-width:3px
 ```
+
+
+
+
 ```
 app/
 │
