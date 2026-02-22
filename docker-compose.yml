@@ -103,7 +103,7 @@ services:
   # ─── API Gateway ───────────────────────────────────────────────────────────
   api-gateway:
     build:
-      context: ./ api-gateway
+      context: ./api-gateway
       dockerfile: Dockerfile
     container_name: api-gateway
     ports:
