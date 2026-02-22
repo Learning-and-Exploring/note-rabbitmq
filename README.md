@@ -1,5 +1,4 @@
-# Folder Structure of Even Driven Architecture 
-
+# Folder Structure of Even Driven Architecture
 
 <h3>🛠 Tech Stack ⚛</h3>
 
@@ -36,16 +35,11 @@ A scalable, event-driven microservices architecture built with **Node.js** and *
 
 The application is split into distinct domain services. Communication is handled via REST APIs for synchronous operations and RabbitMQ for asynchronous event propagation.
 
-
-
 ### The Flow
+
 1.  **User Service**: Handles user authentication and management. When a user state changes (e.g., created, updated), it **publishes** an event to the message broker.
 2.  **RabbitMQ**: Acts as the message broker, routing events to the appropriate queues.
 3.  **Note Service**: Manages user notes. It **consumes** user events to maintain data consistency (e.g., creating a default welcome note when a new user registers).
-
-
-
-
 
 ```mermaid
 graph LR
@@ -78,9 +72,6 @@ graph LR
     linkStyle 3 stroke:#FF6600,stroke-width:2px,stroke-dasharray: 5 5
     linkStyle 4 stroke:#FF6600,stroke-width:3px
 ```
-
-
-
 
 ```
 app/.
@@ -143,4 +134,21 @@ app/.
     └── tsconfig.json
 
 ```
+
+---
+
+## 🚧 Next Steps
+
+The following steps are needed to complete the project end-to-end:
+
+1. **Fill in service code** — implement `server.ts`, `app.ts`, routes, controllers, and services in both `user-service` and `note-service`
+2. **Set up RabbitMQ connection** — configure `config/rabbitmq.ts` in each service (connect, declare exchange & queues)
+3. **Publish events** — in `user-service`, after a user is created/updated, publish a `user.created` event to RabbitMQ
+4. **Consume events** — in `note-service`, listen for `user.created`, then create a `SyncedUser` record + a default welcome `Note`
+5. **Run migrations** — once Postgres is up via Docker, run `npm run db:migrate` in each service to create the tables
+6. **Wire up the API Gateway** — `api-gateway` proxies requests to the correct service
+7. **Run & test** — `docker compose up --build`, then hit the endpoints to verify the full event-driven flow
+
+> Build order: **DB → RabbitMQ config → user-service → note-service → gateway → test**
+
 ---
