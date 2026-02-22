@@ -76,16 +76,25 @@ graph LR
 ```
 app/.
 ├──  api-gateway
-│   └── src
-│       ├── app.ts
-│       ├── middleware
-│       │   └── auth.middleware.ts
-│       └── routes
-│           ├── note.proxy.ts
-│           └── user.proxy.ts
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── src
+│   │   ├── app.ts
+│   │   ├── middleware
+│   │   │   └── auth.middleware.ts
+│   │   └── routes
+│   │       ├── note.proxy.ts
+│   │       └── user.proxy.ts
+│   └── tsconfig.json
+├── DATABASE.md
 ├── docker-compose.yml
 ├── note-service
+│   ├── Dockerfile
 │   ├── package.json
+│   ├── package-lock.json
+│   ├── prisma
+│   │   └── schema.prisma
 │   ├── src
 │   │   ├── app.ts
 │   │   ├── config
@@ -109,7 +118,11 @@ app/.
 │   └── tsconfig.json
 ├── README.md
 └── user-service
+    ├── Dockerfile
     ├── package.json
+    ├── package-lock.json
+    ├── prisma
+    │   └── schema.prisma
     ├── src
     │   ├── app.ts
     │   ├── config
@@ -132,6 +145,7 @@ app/.
     │       ├── database.ts
     │       └── logger.ts
     └── tsconfig.json
+
 
 ```
 
