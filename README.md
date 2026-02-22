@@ -26,7 +26,6 @@
 
 <div align="center">
   <h2>Micro Service Architecture</h2>
-  <img src="public/micro-service-architecture.png" alt="Event-Driven Microservices Architecture Diagram" width="800" />
 </div>
 
 A scalable, event-driven microservices architecture built with **Node.js** and **TypeScript**. This project demonstrates asynchronous communication between services using **RabbitMQ** to decouple business logic and ensure high availability.
