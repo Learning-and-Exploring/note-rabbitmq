@@ -8,6 +8,7 @@ services:
       - '5672:5672'     # AMQP protocol
       - '15672:15672'   # Management UI → http://localhost:15672
     environment:
+      TZ: Asia/Phnom_Penh
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
@@ -23,6 +24,7 @@ services:
     image: postgres:16-alpine
     container_name: user-db
     environment:
+      TZ: Asia/Phnom_Penh
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: user_service_db
@@ -43,6 +45,7 @@ services:
     image: postgres:16-alpine
     container_name: note-db
     environment:
+      TZ: Asia/Phnom_Penh
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: note_service_db
@@ -67,6 +70,7 @@ services:
     ports:
       - '3001:3001'
     environment:
+      TZ: Asia/Phnom_Penh
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://postgres:password@user-db:5432/user_service_db?schema=public
@@ -88,6 +92,7 @@ services:
     ports:
       - '3002:3002'
     environment:
+      TZ: Asia/Phnom_Penh
       NODE_ENV: production
       PORT: 3002
       DATABASE_URL: postgresql://postgres:password@note-db:5432/note_service_db?schema=public
@@ -109,6 +114,7 @@ services:
     ports:
       - '3000:3000'
     environment:
+      TZ: Asia/Phnom_Penh
       NODE_ENV: production
       PORT: 3000
       USER_SERVICE_URL: http://user-service:3001
