@@ -29,5 +29,5 @@ RUN npx prisma generate
 
 EXPOSE 3001
 
-# Run migrations then start the app
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Sync schema then start the app (project currently has no prisma/migrations)
+CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
