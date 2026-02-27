@@ -2,11 +2,11 @@ import amqplib, { Channel, ChannelModel } from "amqplib";
 import { env } from "./env";
 import { logger } from "../shared/logger";
 
-// ── Constants shared with user-service ──────────────────────────────────────
-export const EXCHANGE_NAME = "user.events";
+// ── Constants shared with auth-service ──────────────────────────────────────
+export const EXCHANGE_NAME = "auth.events";
 export const EXCHANGE_TYPE = "topic";
-export const QUEUE_NAME = "note-service.user.events";
-export const ROUTING_KEY = "user.*"; // matches user.created, user.updated, etc.
+export const QUEUE_NAME = "note-service.auth.events";
+export const ROUTING_KEY = "auth.*"; // matches auth.created, auth.updated, etc.
 
 // ── Singleton ────────────────────────────────────────────────────────────────
 // amqplib v0.10+ returns ChannelModel from connect()
@@ -19,7 +19,7 @@ export async function connectRabbitMQ(): Promise<Channel> {
   connection = await amqplib.connect(env.RABBITMQ_URL);
   channel = await connection.createChannel();
 
-  // Mirror the exchange declared in user-service
+  // Mirror the exchange declared in auth-service
   await channel.assertExchange(EXCHANGE_NAME, EXCHANGE_TYPE, { durable: true });
 
   // Declare a durable queue bound to the exchange

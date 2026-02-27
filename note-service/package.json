@@ -1,7 +1,7 @@
 {
   "name": "note-service",
   "version": "1.0.0",
-  "description": "Note service - manages notes, syncs user data via RabbitMQ",
+  "description": "Note service - manages notes, syncs auth data via RabbitMQ",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node src/server.ts",

@@ -8,6 +8,7 @@ services:
       - '5672:5672'     # AMQP protocol
       - '15672:15672'   # Management UI → http://localhost:15672
     environment:
+      TZ: Asia/Phnom_Penh
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
@@ -18,20 +19,21 @@ services:
     networks:
       - microservices-net
 
-  # ─── User Service Database ─────────────────────────────────────────────────
-  user-db:
+  # ─── Auth Service Database ─────────────────────────────────────────────────
+  auth-db:
     image: postgres:16-alpine
-    container_name: user-db
+    container_name: auth-db
     environment:
+      TZ: Asia/Phnom_Penh
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: user_service_db
+      POSTGRES_DB: auth_service_db
     ports:
       - '5433:5432'   # host:5433 to avoid conflicts with a local postgres
     volumes:
-      - user-db-data:/var/lib/postgresql/data
+      - auth-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d user_service_db']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d auth_service_db']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,6 +45,7 @@ services:
     image: postgres:16-alpine
     container_name: note-db
     environment:
+      TZ: Asia/Phnom_Penh
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: note_service_db
@@ -58,21 +61,22 @@ services:
     networks:
       - microservices-net
 
-  # ─── User Service ──────────────────────────────────────────────────────────
-  user-service:
+  # ─── Auth Service ──────────────────────────────────────────────────────────
+  auth-service:
     build:
-      context: ./user-service
+      context: ./auth-service
       dockerfile: Dockerfile
-    container_name: user-service
+    container_name: auth-service
     ports:
       - '3001:3001'
     environment:
+      TZ: Asia/Phnom_Penh
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://postgres:password@user-db:5432/user_service_db?schema=public
+      DATABASE_URL: postgresql://postgres:password@auth-db:5432/auth_service_db?schema=public
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     depends_on:
-      user-db:
+      auth-db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -88,6 +92,7 @@ services:
     ports:
       - '3002:3002'
     environment:
+      TZ: Asia/Phnom_Penh
       NODE_ENV: production
       PORT: 3002
       DATABASE_URL: postgresql://postgres:password@note-db:5432/note_service_db?schema=public
@@ -109,18 +114,19 @@ services:
     ports:
       - '3000:3000'
     environment:
+      TZ: Asia/Phnom_Penh
       NODE_ENV: production
       PORT: 3000
-      USER_SERVICE_URL: http://user-service:3001
+      AUTH_SERVICE_URL: http://auth-service:3001
       NOTE_SERVICE_URL: http://note-service:3002
     depends_on:
-      - user-service
+      - auth-service
       - note-service
     networks:
       - microservices-net
 
 volumes:
-  user-db-data:
+  auth-db-data:
   note-db-data:
 
 networks:

@@ -9,7 +9,7 @@ This project uses **PostgreSQL** as the database engine and **Prisma** as the OR
 Each service owns its own isolated database. Services **never share** a database or query each other's tables directly.
 
 ```
-user-service  →  user_service_db  (PostgreSQL)
+auth-service  →  auth_service_db  (PostgreSQL)
 note-service  →  note_service_db  (PostgreSQL)
 ```
 
@@ -40,10 +40,10 @@ Each service has its own `prisma/` directory with a completely independent schem
 
 ## Schemas
 
-### `user-service` — `user_service_db`
+### `auth-service` — `auth_service_db`
 
 ```prisma
-model User {
+model Auth {
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String   @map("password_hash")
@@ -51,11 +51,11 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  @@map("users")
+  @@map("auths")
 }
 ```
 
-**Purpose:** Stores registered users. This is the **source of truth** for user identity. When a user is created/updated, the service publishes a RabbitMQ event so other services can react.
+**Purpose:** Stores registered auths. This is the **source of truth** for auth identity. When a auth is created/updated, the service publishes a RabbitMQ event so other services can react.
 
 ---
 
@@ -64,7 +64,7 @@ model User {
 ```prisma
 model Note {
   id        String   @id @default(uuid())
-  userId    String   @map("user_id")
+  authId    String   @map("auth_id")
   title     String   @default("Welcome Note")
   content   String?
   createdAt DateTime @default(now()) @map("created_at")
@@ -73,22 +73,22 @@ model Note {
   @@map("notes")
 }
 
-model SyncedUser {
+model SyncedAuth {
   id       String   @id
   name     String?
   email    String
   syncedAt DateTime @default(now()) @map("synced_at")
 
-  @@map("synced_users")
+  @@map("synced_auths")
 }
 ```
 
 **Purpose:**
 
-- `Note` — stores user notes. `userId` is a plain column (not a FK to another service's DB).
-- `SyncedUser` — a **local shadow copy** of user data populated by consuming `user.created` / `user.updated` RabbitMQ events. This avoids synchronous calls to `user-service` at query time.
+- `Note` — stores auth notes. `authId` is a plain column (not a FK to another service's DB).
+- `SyncedAuth` — a **local shadow copy** of auth data populated by consuming `auth.created` / `auth.updated` RabbitMQ events. This avoids synchronous calls to `auth-service` at query time.
 
-> ⚠️ `SyncedUser` is intentionally **not** a foreign key to `user-service`'s DB. Services must never cross DB boundaries.
+> ⚠️ `SyncedAuth` is intentionally **not** a foreign key to `auth-service`'s DB. Services must never cross DB boundaries.
 
 ---
 
@@ -118,7 +118,7 @@ Import it anywhere in the service:
 ```typescript
 import { prisma } from "../shared/database";
 
-const user = await prisma.user.findUnique({ where: { id } });
+const auth = await prisma.auth.findUnique({ where: { id } });
 ```
 
 ---
@@ -129,10 +129,10 @@ Each service has its own `.env` file:
 
 | Service        | Variable       | Example Value                                                   |
 | -------------- | -------------- | --------------------------------------------------------------- |
-| `user-service` | `DATABASE_URL` | `postgresql://postgres:password@localhost:5433/user_service_db` |
+| `auth-service` | `DATABASE_URL` | `postgresql://postgres:password@localhost:5433/auth_service_db` |
 | `note-service` | `DATABASE_URL` | `postgresql://postgres:password@localhost:5434/note_service_db` |
 
-In Docker, these are injected via `docker-compose.yml` and point to the service containers (`user-db`, `note-db`).
+In Docker, these are injected via `docker-compose.yml` and point to the service containers (`auth-db`, `note-db`).
 
 ---
 
@@ -165,7 +165,7 @@ The `docker-compose.yml` provisions two isolated Postgres containers:
 
 | Container | DB Name           | Host Port |
 | --------- | ----------------- | --------- |
-| `user-db` | `user_service_db` | `5433`    |
+| `auth-db` | `auth_service_db` | `5433`    |
 | `note-db` | `note_service_db` | `5434`    |
 
 Both use the `postgres:16-alpine` image with health checks. Services wait for their DB to be healthy before starting, which automatically runs `prisma migrate deploy` on boot.

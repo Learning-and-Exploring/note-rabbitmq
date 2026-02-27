@@ -1,7 +1,7 @@
 {
   "name": "user-service",
   "version": "1.0.0",
-  "description": "User service - handles auth & user management",
+  "description": "User service - handles user authentication & user management",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node src/server.ts",

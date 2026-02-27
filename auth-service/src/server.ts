@@ -1,0 +1,18 @@
+import app from "./app";
+import { connectRabbitMQ } from "./config/rabbitmq";
+import { env } from "./config/env";
+import { logger } from "./shared/logger";
+
+async function bootstrap() {
+  // Connect to RabbitMQ before accepting HTTP traffic
+  await connectRabbitMQ();
+
+  app.listen(env.PORT, () => {
+    logger.info(`[auth-service] Running on http://localhost:${env.PORT}`);
+  });
+}
+
+bootstrap().catch((err) => {
+  logger.error("[auth-service] Failed to start:", err.message);
+  process.exit(1);
+});

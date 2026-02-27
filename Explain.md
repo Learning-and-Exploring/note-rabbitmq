@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is an **event-driven microservices system** built with **Node.js + TypeScript**. It demonstrates how two independent services (`user-service` and `note-service`) communicate asynchronously using **RabbitMQ** as a message broker, without ever calling each other directly over HTTP.
+This project is an **event-driven microservices system** built with **Node.js + TypeScript**. It demonstrates how two independent services (`auth-service` and `note-service`) communicate asynchronously using **RabbitMQ** as a message broker, without ever calling each other directly over HTTP.
 
 There is also an **API Gateway** sitting in front of both services to act as a single entry point for clients.
 
@@ -21,7 +21,7 @@ Client (HTTP)
   ─────┴─────────────────────
   ▼                       ▼
 ┌──────────────┐    ┌──────────────┐
-│ user-service │    │ note-service │
+│ auth-service │    │ note-service │
 │    :3001     │    │    :3002     │
 └──────┬───────┘    └──────┬───────┘
        │  PUBLISH          │  CONSUME
@@ -35,13 +35,13 @@ Client (HTTP)
   ─────────────────────────
   ▼                        ▼
 ┌────────┐           ┌───────────┐
-│user-db │           │  note-db  │
+│auth-db │           │  note-db  │
 │ :5433  │           │   :5434   │
 │Postgres│           │  Postgres │
 └────────┘           └───────────┘
 ```
 
-**Key principle:** Services **never call each other directly (no HTTP between them)**. Instead, `user-service` **publishes** events to RabbitMQ, and `note-service` **consumes** those events and reacts accordingly.
+**Key principle:** Services **never call each other directly (no HTTP between them)**. Instead, `auth-service` **publishes** events to RabbitMQ, and `note-service` **consumes** those events and reacts accordingly.
 
 ---
 
@@ -54,13 +54,13 @@ RabbitMQ/
 ├── README.md                   # Quick-start guide
 ├── Explain.md                  # ← You are here
 │
-├── user-service/               # Produces events to RabbitMQ
+├── auth-service/               # Produces events to RabbitMQ
 │   ├── Dockerfile
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── .env                    # PORT, DATABASE_URL, RABBITMQ_URL
 │   ├── prisma/
-│   │   └── schema.prisma       # User model (PostgreSQL)
+│   │   └── schema.prisma       # Auth model (PostgreSQL)
 │   └── src/
 │       ├── server.ts           # Entry point — boot RabbitMQ then HTTP server
 │       ├── app.ts              # Express app setup (middleware, routes, error handlers)
@@ -69,16 +69,16 @@ RabbitMQ/
 │       │   └── rabbitmq.ts     # RabbitMQ connection + channel + exchange declaration
 │       ├── events/
 │       │   ├── publishers/
-│       │   │   └── user.publisher.ts   # publishUserCreated() function
+│       │   │   └── auth.publisher.ts   # publishAuthCreated() function
 │       │   └── types/
-│       │       └── user.events.types.ts  # Event name constants + TypeScript payload interfaces
+│       │       └── auth.events.types.ts  # Event name constants + TypeScript payload interfaces
 │       ├── modules/
-│       │   └── user/
-│       │       ├── user.model.ts       # CreateUserDto, GetUserDto interfaces
-│       │       ├── user.routes.ts      # Express Router: POST /users, GET /users, GET /users/:id
-│       │       ├── user.controller.ts  # HTTP request/response logic
-│       │       ├── user.service.ts     # Business logic (create, get) — calls publisher after DB write
-│       │       └── user.events.ts      # Re-export barrel for event types + publisher
+│       │   └── auth/
+│       │       ├── auth.model.ts       # CreateAuthDto, GetAuthDto interfaces
+│       │       ├── auth.routes.ts      # Express Router: POST /auths, GET /auths, GET /auths/:id
+│       │       ├── auth.controller.ts  # HTTP request/response logic
+│       │       ├── auth.service.ts     # Business logic (create, get) — calls publisher after DB write
+│       │       └── auth.events.ts      # Re-export barrel for event types + publisher
 │       └── shared/
 │           ├── database.ts     # Prisma client singleton
 │           └── logger.ts       # Logger wrapper (likely winston/console)
@@ -89,7 +89,7 @@ RabbitMQ/
 │   ├── tsconfig.json
 │   ├── .env                    # PORT, DATABASE_URL, RABBITMQ_URL
 │   ├── prisma/
-│   │   └── schema.prisma       # Note + SyncedUser models (PostgreSQL)
+│   │   └── schema.prisma       # Note + SyncedAuth models (PostgreSQL)
 │   └── src/
 │       ├── server.ts           # Entry point — boot RabbitMQ + start consumer, then HTTP server
 │       ├── app.ts              # Express app setup
@@ -98,15 +98,15 @@ RabbitMQ/
 │       │   └── rabbitmq.ts     # RabbitMQ connection + queue + binding declaration
 │       ├── events/
 │       │   ├── consumers/
-│       │   │   └── user.consumer.ts    # startUserConsumer() — reads messages from queue
+│       │   │   └── auth.consumer.ts    # startAuthConsumer() — reads messages from queue
 │       │   └── handlers/
-│       │       └── user.event.handler.ts  # handleUserCreated() — business logic for the event
+│       │       └── auth.event.handler.ts  # handleAuthCreated() — business logic for the event
 │       ├── modules/
 │       │   └── note/
 │       │       ├── note.model.ts       # CreateNoteDto, NoteResponse interfaces
 │       │       ├── note.routes.ts      # Express Router: CRUD for notes
 │       │       ├── note.controller.ts  # HTTP request/response logic
-│       │       └── note.service.ts     # Business logic (CRUD notes + upsertSyncedUser)
+│       │       └── note.service.ts     # Business logic (CRUD notes + upsertSyncedAuth)
 │       └── shared/
 │           ├── database.ts     # Prisma client singleton
 │           └── logger.ts       # Logger wrapper
@@ -114,37 +114,37 @@ RabbitMQ/
 └── api-gateway/                # HTTP reverse proxy (no RabbitMQ involvement)
     ├── Dockerfile
     └── src/
-        └── ...                 # Proxies requests to user-service and note-service
+        └── ...                 # Proxies requests to auth-service and note-service
 ```
 
 ---
 
 ## Service Breakdown
 
-### 1. `user-service` — The Event **Producer**
+### 1. `auth-service` — The Event **Producer**
 
-Exposes a REST API and **publishes RabbitMQ events** whenever user data changes.
+Exposes a REST API and **publishes RabbitMQ events** whenever auth data changes.
 
 #### HTTP API (port 3001)
 
 | Method | Path         | Description       |
 | ------ | ------------ | ----------------- |
-| POST   | `/users`     | Create a new user |
-| GET    | `/users`     | List all users    |
-| GET    | `/users/:id` | Get a user by ID  |
+| POST   | `/auths`     | Create a new auth |
+| GET    | `/auths`     | List all auths    |
+| GET    | `/auths/:id` | Get a auth by ID  |
 | GET    | `/health`    | Health check      |
 
-#### Database Schema (Prisma — `user_service_db`)
+#### Database Schema (Prisma — `auth_service_db`)
 
 ```prisma
-model User {
+model Auth {
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String   @map("password_hash")
   name         String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
-  @@map("users")
+  @@map("auths")
 }
 ```
 
@@ -166,7 +166,7 @@ model User {
 
 ### 2. `note-service` — The Event **Consumer**
 
-Exposes a REST API for notes and **listens to RabbitMQ events** to react to user lifecycle events.
+Exposes a REST API for notes and **listens to RabbitMQ events** to react to auth lifecycle events.
 
 #### HTTP API (port 3002)
 
@@ -174,7 +174,7 @@ Exposes a REST API for notes and **listens to RabbitMQ events** to react to user
 | ------ | --------------------- | ------------------------ |
 | POST   | `/notes`              | Create a note manually   |
 | GET    | `/notes`              | List all notes           |
-| GET    | `/notes/user/:userId` | Get all notes for a user |
+| GET    | `/notes/auth/:authId` | Get all notes for a auth |
 | GET    | `/notes/:id`          | Get a note by ID         |
 
 #### Database Schema (Prisma — `note_service_db`)
@@ -182,7 +182,7 @@ Exposes a REST API for notes and **listens to RabbitMQ events** to react to user
 ```prisma
 model Note {
   id        String   @id @default(uuid())
-  userId    String   @map("user_id")
+  authId    String   @map("auth_id")
   title     String   @default("Welcome Note")
   content   String?
   createdAt DateTime @default(now()) @map("created_at")
@@ -190,24 +190,24 @@ model Note {
   @@map("notes")
 }
 
-// Local shadow of User data — populated via RabbitMQ events, NOT a DB foreign key
-model SyncedUser {
-  id       String   @id  -- same UUID from user-service
+// Local shadow of Auth data — populated via RabbitMQ events, NOT a DB foreign key
+model SyncedAuth {
+  id       String   @id  -- same UUID from auth-service
   name     String?
   email    String
   syncedAt DateTime @default(now()) @map("synced_at")
-  @@map("synced_users")
+  @@map("synced_auths")
 }
 ```
 
-**Why `SyncedUser`?**  
-In microservices, each service owns its own database. `note-service` cannot query `user-service`'s database directly. Instead, when a `user.created` event arrives via RabbitMQ, `note-service` copies the essential user data (`id`, `email`, `name`) into its own `synced_users` table. This is the **"local read model"** pattern.
+**Why `SyncedAuth`?**  
+In microservices, each service owns its own database. `note-service` cannot query `auth-service`'s database directly. Instead, when a `auth.created` event arrives via RabbitMQ, `note-service` copies the essential auth data (`id`, `email`, `name`) into its own `synced_auths` table. This is the **"local read model"** pattern.
 
 #### Startup Flow (`server.ts`)
 
 ```
 1. await connectRabbitMQ()    — connect, assert exchange, assert queue, bind queue
-2. await startUserConsumer()  — begin listening on queue
+2. await startAuthConsumer()  — begin listening on queue
 3. app.listen(PORT)           — start accepting HTTP requests
 ```
 
@@ -217,7 +217,7 @@ In microservices, each service owns its own database. `note-service` cannot quer
 
 Listens on port `3000`. It forwards HTTP requests to the appropriate downstream service:
 
-- Routes for users → `http://user-service:3001`
+- Routes for auths → `http://auth-service:3001`
 - Routes for notes → `http://note-service:3002`
 
 There is **no RabbitMQ involvement** in the gateway — it purely handles HTTP routing/proxying.
@@ -230,10 +230,10 @@ There is **no RabbitMQ involvement** in the gateway — it purely handles HTTP r
 
 | Concept         | Value in this project               | Explanation                                                                       |
 | --------------- | ----------------------------------- | --------------------------------------------------------------------------------- |
-| **Exchange**    | `user.events` (type: `topic`)       | Receives published messages and routes them via routing key                       |
-| **Queue**       | `note-service.user.events`          | Holds messages for `note-service` to consume                                      |
-| **Binding**     | routing key `user.*`                | Connects the queue to the exchange — matches `user.created`, `user.updated`, etc. |
-| **Routing Key** | `user.created`                      | Sent with each message to identify its type                                       |
+| **Exchange**    | `auth.events` (type: `topic`)       | Receives published messages and routes them via routing key                       |
+| **Queue**       | `note-service.auth.events`          | Holds messages for `note-service` to consume                                      |
+| **Binding**     | routing key `auth.*`                | Connects the queue to the exchange — matches `auth.created`, `auth.updated`, etc. |
+| **Routing Key** | `auth.created`                      | Sent with each message to identify its type                                       |
 | **Durability**  | `durable: true` on exchange & queue | Messages survive a RabbitMQ broker restart                                        |
 | **Persistence** | `persistent: true` on messages      | Individual messages survive a broker restart                                      |
 | **prefetch(1)** | note-service only                   | Process one message at a time — prevents overwhelming the consumer                |
@@ -244,60 +244,60 @@ There is **no RabbitMQ involvement** in the gateway — it purely handles HTTP r
 A **topic exchange** routes messages based on a **routing key pattern**. The `#` wildcard matches zero or more words, and `*` matches exactly one word.
 
 ```
-Exchange: user.events  (topic)
+Exchange: auth.events  (topic)
                 │
     ┌───────────┴───────────────┐
     │  Binding: routing key     │
-    │  pattern = "user.*"       │
+    │  pattern = "auth.*"       │
     └───────────┬───────────────┘
                 │
-    Queue: note-service.user.events
+    Queue: note-service.auth.events
 ```
 
-So if tomorrow you add a new service (e.g., `email-service`) that also wants to receive `user.created`, it just declares its **own queue** and binds it to the **same exchange** with the same pattern — no changes to `user-service` are needed. This is the power of the Publish–Subscribe pattern.
+So if tomorrow you add a new service (e.g., `email-service`) that also wants to receive `auth.created`, it just declares its **own queue** and binds it to the **same exchange** with the same pattern — no changes to `auth-service` are needed. This is the power of the Publish–Subscribe pattern.
 
 ### The Full Event Flow — Step by Step
 
-#### When a new user registers (`POST /users`):
+#### When a new auth registers (`POST /auths`):
 
 ```
-1. Client → POST http://localhost:3000/users
+1. Client → POST http://localhost:3000/auths
               { email, password, name }
 
-2. api-gateway → forwards to → user-service:3001/users
+2. api-gateway → forwards to → auth-service:3001/auths
 
-3. user-service (user.controller.ts)
+3. auth-service (auth.controller.ts)
    └── validates request body
 
-4. user-service (user.service.ts)
+4. auth-service (auth.service.ts)
    ├── Hash password with bcryptjs
-   ├── INSERT user into user_service_db (Postgres)
-   └── publishUserCreated({ id, email, name, createdAt })
+   ├── INSERT auth into auth_service_db (Postgres)
+   └── publishAuthCreated({ id, email, name, createdAt })
            ↓
-5. user.publisher.ts
+5. auth.publisher.ts
    └── channel.publish(
-         exchange: "user.events",
-         routingKey: "user.created",
+         exchange: "auth.events",
+         routingKey: "auth.created",
          content: JSON.stringify(payload),
          { persistent: true }
        )
            ↓ (async, non-blocking)
 6. RabbitMQ broker
-   └── Routes "user.created" → queue "note-service.user.events"
+   └── Routes "auth.created" → queue "note-service.auth.events"
            ↓
-7. note-service (user.consumer.ts) — always running
+7. note-service (auth.consumer.ts) — always running
    └── Receives message from queue
    └── Reads routingKey from message fields
    └── switch(routingKey):
-         case "user.created": handleUserCreated(payload) ✓
+         case "auth.created": handleAuthCreated(payload) ✓
          default: logs warning, acks message
 
-8. user.event.handler.ts
-   ├── noteService.upsertSyncedUser({ id, email, name })
-   │     → INSERT/UPDATE synced_users in note_service_db
+8. auth.event.handler.ts
+   ├── noteService.upsertSyncedAuth({ id, email, name })
+   │     → INSERT/UPDATE synced_auths in note_service_db
    │
    └── noteService.createNote({
-           userId: id,
+           authId: id,
            title: "Welcome! 🎉",
            content: "Hello <name>! This is your first note..."
        })
@@ -329,7 +329,7 @@ This layered design means each file has one clear responsibility.
 
 ## Database Design
 
-### `user-service` owns `user_service_db`
+### `auth-service` owns `auth_service_db`
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -351,7 +351,7 @@ This layered design means each file has one clear responsibility.
 │                       notes                           │
 ├────────────────┬──────────────────────────────────────┤
 │ id             │ UUID (PK, auto-generated)            │
-│ user_id        │ UUID (references synced_users.id     │
+│ auth_id        │ UUID (references synced_auths.id     │
 │                │  — no DB-level FK across services)   │
 │ title          │ VARCHAR (default: "Welcome Note")    │
 │ content        │ TEXT (nullable)                      │
@@ -369,7 +369,7 @@ This layered design means each file has one clear responsibility.
 └────────────────┴──────────────────────────────────────┘
 ```
 
-**Important:** There is **no database-level foreign key** between `note_service_db.synced_users` and `user_service_db.users`. The relationship is maintained purely through event-driven synchronisation via RabbitMQ. This is intentional — it preserves database isolation between microservices.
+**Important:** There is **no database-level foreign key** between `note_service_db.synced_auths` and `auth_service_db.auths`. The relationship is maintained purely through event-driven synchronisation via RabbitMQ. This is intentional — it preserves database isolation between microservices.
 
 ---
 
@@ -380,9 +380,9 @@ The `docker-compose.yml` runs 6 containers on the same Docker bridge network (`m
 | Container      | Image                           | Port (host) | Purpose                         |
 | -------------- | ------------------------------- | ----------- | ------------------------------- |
 | `rabbitmq`     | rabbitmq:3.13-management-alpine | 5672, 15672 | Message broker + Management UI  |
-| `user-db`      | postgres:16-alpine              | 5433        | user-service's PostgreSQL DB    |
+| `auth-db`      | postgres:16-alpine              | 5433        | auth-service's PostgreSQL DB    |
 | `note-db`      | postgres:16-alpine              | 5434        | note-service's PostgreSQL DB    |
-| `user-service` | Built from `./user-service`     | 3001        | User management API + publisher |
+| `auth-service` | Built from `./auth-service`     | 3001        | Auth management API + publisher |
 | `note-service` | Built from `./note-service`     | 3002        | Notes API + event consumer      |
 | `api-gateway`  | Built from `./api-gateway`      | 3000        | Single HTTP entry point         |
 
@@ -392,13 +392,13 @@ Docker Compose uses `depends_on` with `condition: service_healthy` to ensure sta
 
 ```
 rabbitmq     →  healthy
-user-db      →  healthy
+auth-db      →  healthy
 note-db      →  healthy
                    ↓
-user-service (waits for user-db + rabbitmq to be healthy)
+auth-service (waits for auth-db + rabbitmq to be healthy)
 note-service (waits for note-db + rabbitmq to be healthy)
                    ↓
-api-gateway  (waits for user-service + note-service to start)
+api-gateway  (waits for auth-service + note-service to start)
 ```
 
 This prevents services from crashing on startup due to missing dependencies.
@@ -408,9 +408,9 @@ This prevents services from crashing on startup due to missing dependencies.
 | Service            | Internal Port | External (host) Port |
 | ------------------ | ------------- | -------------------- |
 | api-gateway        | 3000          | 3000                 |
-| user-service       | 3001          | 3001                 |
+| auth-service       | 3001          | 3001                 |
 | note-service       | 3002          | 3002                 |
-| user-db (Postgres) | 5432          | 5433                 |
+| auth-db (Postgres) | 5432          | 5433                 |
 | note-db (Postgres) | 5432          | 5434                 |
 | RabbitMQ AMQP      | 5672          | 5672                 |
 | RabbitMQ UI        | 15672         | 15672                |
@@ -423,14 +423,14 @@ This prevents services from crashing on startup due to missing dependencies.
 
 ### 1. Event-Driven Architecture
 
-Services are **loosely coupled**. `user-service` does not know about `note-service`. It simply fires a `user.created` event. Any service that cares can subscribe. Adding more consumers in the future requires **zero changes** to `user-service`.
+Services are **loosely coupled**. `auth-service` does not know about `note-service`. It simply fires a `auth.created` event. Any service that cares can subscribe. Adding more consumers in the future requires **zero changes** to `auth-service`.
 
 ### 2. Fire-and-Forget Publishing
 
-In `user.service.ts`, after a user is saved to the database:
+In `auth.service.ts`, after a auth is saved to the database:
 
 ```typescript
-publishUserCreated({ id, email, name, createdAt }); // no await!
+publishAuthCreated({ id, email, name, createdAt }); // no await!
 ```
 
 This is intentional. The HTTP response returns immediately to the client. The event is published asynchronously in the background. RabbitMQ guarantees delivery.
@@ -457,12 +457,12 @@ export function getChannel(): Channel {
 
 This avoids the overhead of creating new connections on every request.
 
-### 5. Local Read Model (SyncedUser)
+### 5. Local Read Model (SyncedAuth)
 
-`note-service` maintains its own copy of user data in `synced_users`. This allows note-service to:
+`note-service` maintains its own copy of auth data in `synced_auths`. This allows note-service to:
 
-- Work fully offline from user-service.
-- Join/query user info without cross-service HTTP calls.
+- Work fully offline from auth-service.
+- Join/query auth info without cross-service HTTP calls.
 - Remain consistent via event-driven updates.
 
 ### 6. Environment Variable Configuration
@@ -499,23 +499,23 @@ docker compose up --build
 | URL                          | Description                          |
 | ---------------------------- | ------------------------------------ |
 | http://localhost:3000        | API Gateway (main entry point)       |
-| http://localhost:3001/health | user-service health check            |
+| http://localhost:3001/health | auth-service health check            |
 | http://localhost:3002/health | note-service health check            |
 | http://localhost:15672       | RabbitMQ Management UI (guest/guest) |
 
 ### Example API calls
 
 ```bash
-# Create a user (triggers the full RabbitMQ event flow)
-curl -X POST http://localhost:3000/users \
+# Create a auth (triggers the full RabbitMQ event flow)
+curl -X POST http://localhost:3000/auths \
   -H "Content-Type: application/json" \
   -d '{"email":"alice@example.com","password":"secret123","name":"Alice"}'
 
 # Get all notes (alice's welcome note should appear automatically)
 curl http://localhost:3000/notes
 
-# Get notes for a specific user
-curl http://localhost:3000/notes/user/<userId>
+# Get notes for a specific auth
+curl http://localhost:3000/notes/auth/<authId>
 ```
 
 ---
@@ -527,11 +527,11 @@ curl http://localhost:3000/notes/user/<userId>
 | Language              | TypeScript (Node.js)                                    |
 | Framework             | Express.js                                              |
 | Message Broker        | RabbitMQ 3.13 (AMQP protocol)                           |
-| Exchange Type         | Topic exchange (`user.events`)                          |
+| Exchange Type         | Topic exchange (`auth.events`)                          |
 | ORM                   | Prisma                                                  |
 | Database              | PostgreSQL 16 (separate DB per service)                 |
 | Containerisation      | Docker + Docker Compose                                 |
 | Communication Pattern | Publish/Subscribe via RabbitMQ (async, one-way)         |
 | HTTP (inter-service)  | ❌ Not used — services do not call each other over HTTP |
-| Event produced        | `user.created` (routing key)                            |
-| Event consumed        | `user.created` → sync user + create welcome note        |
+| Event produced        | `auth.created` (routing key)                            |
+| Event consumed        | `auth.created` → sync auth + create welcome note        |

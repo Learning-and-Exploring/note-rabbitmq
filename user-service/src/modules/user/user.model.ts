@@ -3,8 +3,8 @@ export type { User } from "@prisma/client";
 
 // DTO types used for creating / querying users
 export interface CreateUserDto {
+  id: string;
   email: string;
-  password: string;
   name?: string;
 }
 

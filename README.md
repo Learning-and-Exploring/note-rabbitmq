@@ -37,9 +37,9 @@ The application is split into distinct domain services. Communication is handled
 
 ### The Flow
 
-1.  **User Service**: Handles user authentication and management. When a user state changes (e.g., created, updated), it **publishes** an event to the message broker.
+1.  **Auth Service**: Handles auth authentication and management. When a auth state changes (e.g., created, updated), it **publishes** an event to the message broker.
 2.  **RabbitMQ**: Acts as the message broker, routing events to the appropriate queues.
-3.  **Note Service**: Manages user notes. It **consumes** user events to maintain data consistency (e.g., creating a default welcome note when a new user registers).
+3.  **Note Service**: Manages auth notes. It **consumes** auth events to maintain data consistency (e.g., creating a default welcome note when a new auth registers).
 
 ```mermaid
 graph LR
@@ -52,10 +52,10 @@ graph LR
 
     %% Nodes
     A[👤 Client]:::client
-    B(⚙️ User Service):::service
-    B_DB[(🗄️ User DB)]:::db
+    B(⚙️ Auth Service):::service
+    B_DB[(🗄️ Auth DB)]:::db
     C{🐇 Exchange}:::broker
-    D[📨 User Queue]:::queue
+    D[📨 Auth Queue]:::queue
     E(⚙️ Note Service):::service
     E_DB[(🗄️ Note DB)]:::db
 
@@ -85,7 +85,7 @@ app/.
 │   │   │   └── auth.middleware.ts
 │   │   └── routes
 │   │       ├── note.proxy.ts
-│   │       └── user.proxy.ts
+│   │       └── auth.proxy.ts
 │   └── tsconfig.json
 ├── DATABASE.md
 ├── docker-compose.yml
@@ -102,9 +102,9 @@ app/.
 │   │   │   └── rabbitmq.ts
 │   │   ├── events
 │   │   │   ├── consumers
-│   │   │   │   └── user.consumer.ts
+│   │   │   │   └── auth.consumer.ts
 │   │   │   └── handlers
-│   │   │       └── user.event.handler.ts
+│   │   │       └── auth.event.handler.ts
 │   │   ├── modules
 │   │   │   └── note
 │   │   │       ├── note.controller.ts
@@ -117,7 +117,7 @@ app/.
 │   │       └── logger.ts
 │   └── tsconfig.json
 ├── README.md
-└── user-service
+└── auth-service
     ├── Dockerfile
     ├── package.json
     ├── package-lock.json
@@ -130,16 +130,16 @@ app/.
     │   │   └── rabbitmq.ts
     │   ├── events
     │   │   ├── publishers
-    │   │   │   └── user.publisher.ts
+    │   │   │   └── auth.publisher.ts
     │   │   └── types
-    │   │       └── user.events.types.ts
+    │   │       └── auth.events.types.ts
     │   ├── modules
-    │   │   └── user
-    │   │       ├── user.controller.ts
-    │   │       ├── user.events.ts
-    │   │       ├── user.model.ts
-    │   │       ├── user.routes.ts
-    │   │       └── user.service.ts
+    │   │   └── auth
+    │   │       ├── auth.controller.ts
+    │   │       ├── auth.events.ts
+    │   │       ├── auth.model.ts
+    │   │       ├── auth.routes.ts
+    │   │       └── auth.service.ts
     │   ├── server.ts
     │   └── shared
     │       ├── database.ts
@@ -155,14 +155,14 @@ app/.
 
 The following steps are needed to complete the project end-to-end:
 
-1. **Fill in service code** — implement `server.ts`, `app.ts`, routes, controllers, and services in both `user-service` and `note-service`
+1. **Fill in service code** — implement `server.ts`, `app.ts`, routes, controllers, and services in both `auth-service` and `note-service`
 2. **Set up RabbitMQ connection** — configure `config/rabbitmq.ts` in each service (connect, declare exchange & queues)
-3. **Publish events** — in `user-service`, after a user is created/updated, publish a `user.created` event to RabbitMQ
-4. **Consume events** — in `note-service`, listen for `user.created`, then create a `SyncedUser` record + a default welcome `Note`
+3. **Publish events** — in `auth-service`, after a auth is created/updated, publish a `auth.created` event to RabbitMQ
+4. **Consume events** — in `note-service`, listen for `auth.created`, then create a `SyncedAuth` record + a default welcome `Note`
 5. **Run migrations** — once Postgres is up via Docker, run `npm run db:migrate` in each service to create the tables
 6. **Wire up the API Gateway** — `api-gateway` proxies requests to the correct service
 7. **Run & test** — `docker compose up --build`, then hit the endpoints to verify the full event-driven flow
 
-> Build order: **DB → RabbitMQ config → user-service → note-service → gateway → test**
+> Build order: **DB → RabbitMQ config → auth-service → note-service → gateway → test**
 
 ---
