@@ -332,24 +332,24 @@ This layered design means each file has one clear responsibility.
 ### `auth-service` owns `auth_service_db`
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                       auths                          │
-├────────────────┬─────────────────────────────────────┤
+┌───────────────────────────────────────────────────────┐
+│                       users                           │
+├────────────────┬──────────────────────────────────────┤
 │ id             │ UUID (PK, auto-generated)            │
 │ email          │ VARCHAR (unique)                     │
 │ password_hash  │ VARCHAR (bcrypt hash)                │
 │ name           │ VARCHAR (nullable)                   │
 │ created_at     │ TIMESTAMP                            │
 │ updated_at     │ TIMESTAMP (auto-updated)             │
-└────────────────┴─────────────────────────────────────┘
+└────────────────┴──────────────────────────────────────┘
 ```
 
 ### `note-service` owns `note_service_db`
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                       notes                          │
-├────────────────┬─────────────────────────────────────┤
+┌───────────────────────────────────────────────────────┐
+│                       notes                           │
+├────────────────┬──────────────────────────────────────┤
 │ id             │ UUID (PK, auto-generated)            │
 │ auth_id        │ UUID (references synced_auths.id     │
 │                │  — no DB-level FK across services)   │
@@ -357,16 +357,16 @@ This layered design means each file has one clear responsibility.
 │ content        │ TEXT (nullable)                      │
 │ created_at     │ TIMESTAMP                            │
 │ updated_at     │ TIMESTAMP (auto-updated)             │
-└────────────────┴─────────────────────────────────────┘
+└────────────────┴──────────────────────────────────────┘
 
-┌──────────────────────────────────────────────────────┐
-│                   synced_auths                       │
-├────────────────┬─────────────────────────────────────┤
-│ id             │ UUID (PK — same UUID as auth-service)│
+┌───────────────────────────────────────────────────────┐
+│                   synced_users                        │
+├────────────────┬──────────────────────────────────────┤
+│ id             │ UUID (PK — same UUID as user-service)│
 │ email          │ VARCHAR                              │
 │ name           │ VARCHAR (nullable)                   │
 │ synced_at      │ TIMESTAMP                            │
-└────────────────┴─────────────────────────────────────┘
+└────────────────┴──────────────────────────────────────┘
 ```
 
 **Important:** There is **no database-level foreign key** between `note_service_db.synced_auths` and `auth_service_db.auths`. The relationship is maintained purely through event-driven synchronisation via RabbitMQ. This is intentional — it preserves database isolation between microservices.
