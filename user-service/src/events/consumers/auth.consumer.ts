@@ -1,13 +1,9 @@
 import { ConsumeMessage } from "amqplib";
 import { getChannel, QUEUE_NAME } from "../../config/rabbitmq";
-import { handleUserCreated } from "../handlers/user.event.handler";
 import { logger } from "../../shared/logger";
+import { handleAuthCreated } from "../handlers/auth.event.handler";
 
-/**
- * Start consuming from the note-service user events queue.
- * Routes messages to the correct handler based on the routing key.
- */
-export async function startUserConsumer(): Promise<void> {
+export async function startAuthConsumer(): Promise<void> {
   const channel = getChannel();
 
   await channel.consume(QUEUE_NAME, async (msg: ConsumeMessage | null) => {
@@ -20,21 +16,19 @@ export async function startUserConsumer(): Promise<void> {
       const payload = JSON.parse(rawContent);
 
       switch (routingKey) {
-        case "user.created":
-          await handleUserCreated(payload);
+        case "auth.created":
+          await handleAuthCreated(payload);
           break;
         default:
           logger.warn(`[Consumer] Unhandled routing key: "${routingKey}"`);
       }
 
-      // Acknowledge the message only after successful processing
       channel.ack(msg);
     } catch (err: any) {
       logger.error(
         `[Consumer] Error processing message (key: ${routingKey}):`,
         err.message,
       );
-      // Reject and requeue the message once
       channel.nack(msg, false, true);
     }
   });

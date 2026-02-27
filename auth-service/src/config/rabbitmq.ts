@@ -2,11 +2,9 @@ import amqplib, { Channel, ChannelModel } from "amqplib";
 import { env } from "./env";
 import { logger } from "../shared/logger";
 
-// ── Constants shared with auth-service ──────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 export const EXCHANGE_NAME = "auth.events";
 export const EXCHANGE_TYPE = "topic";
-export const QUEUE_NAME = "user-service.auth.events";
-export const ROUTING_KEY = "auth.*";
 
 // ── Singleton connection/channel ─────────────────────────────────────────────
 // amqplib v0.10+ returns ChannelModel from connect()
@@ -19,15 +17,10 @@ export async function connectRabbitMQ(): Promise<Channel> {
   connection = await amqplib.connect(env.RABBITMQ_URL);
   channel = await connection.createChannel();
 
-  // Mirror auth-service exchange and bind a dedicated consumer queue
+  // Declare a durable topic exchange so messages survive broker restarts
   await channel.assertExchange(EXCHANGE_NAME, EXCHANGE_TYPE, { durable: true });
-  await channel.assertQueue(QUEUE_NAME, { durable: true });
-  await channel.bindQueue(QUEUE_NAME, EXCHANGE_NAME, ROUTING_KEY);
-  channel.prefetch(1);
 
-  logger.info(
-    `[RabbitMQ] Connected — exchange: "${EXCHANGE_NAME}", queue: "${QUEUE_NAME}"`,
-  );
+  logger.info(`[RabbitMQ] Connected — exchange: "${EXCHANGE_NAME}"`);
 
   connection.on("close", () => {
     logger.warn("[RabbitMQ] Connection closed.");
@@ -54,3 +47,4 @@ export async function closeRabbitMQ(): Promise<void> {
   await channel?.close();
   await connection?.close();
 }
+

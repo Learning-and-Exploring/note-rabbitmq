@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 
 /**
  * Minimal auth middleware stub.
- * In a real project this would verify a JWT and attach req.user.
+ * In a real project this would verify a JWT and attach req.auth.
  * For now it just passes through all requests.
  */
 export function authMiddleware(

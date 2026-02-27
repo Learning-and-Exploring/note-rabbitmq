@@ -1,7 +1,7 @@
 {
   "name": "api-gateway",
   "version": "1.0.0",
-  "description": "API Gateway — proxies requests to user-service and note-service",
+  "description": "API Gateway — proxies requests to auth-service and note-service",
   "main": "dist/app.js",
   "scripts": {
     "dev": "ts-node src/app.ts",

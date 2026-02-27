@@ -3,12 +3,12 @@ import { CreateNoteDto } from "./note.model";
 
 export const noteService = {
   /**
-   * Create a note for a given user.
+   * Create a note for a given auth.
    */
   async createNote(dto: CreateNoteDto) {
     return prisma.note.create({
       data: {
-        userId: dto.userId,
+        authId: dto.authId,
         title: dto.title ?? "Untitled Note",
         content: dto.content,
       },
@@ -23,11 +23,11 @@ export const noteService = {
   },
 
   /**
-   * Get all notes belonging to a specific user.
+   * Get all notes belonging to a specific auth.
    */
-  async getNotesByUser(userId: string) {
+  async getNotesByAuth(authId: string) {
     return prisma.note.findMany({
-      where: { userId },
+      where: { authId },
       orderBy: { createdAt: "desc" },
     });
   },
@@ -42,14 +42,14 @@ export const noteService = {
   },
 
   /**
-   * Upsert a synced user (called by the RabbitMQ event handler).
+   * Upsert a synced auth (called by the RabbitMQ event handler).
    */
-  async upsertSyncedUser(data: {
+  async upsertSyncedAuth(data: {
     id: string;
     email: string;
     name?: string | null;
   }) {
-    return prisma.syncedUser.upsert({
+    return prisma.syncedAuth.upsert({
       where: { id: data.id },
       update: { email: data.email, name: data.name },
       create: { id: data.id, email: data.email, name: data.name },

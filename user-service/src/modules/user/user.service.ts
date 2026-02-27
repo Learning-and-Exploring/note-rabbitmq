@@ -1,29 +1,20 @@
-import bcrypt from "bcryptjs";
 import { prisma } from "../../shared/database";
 import { CreateUserDto } from "./user.model";
-import { publishUserCreated } from "../../events/publishers/user.publisher";
-
-const SALT_ROUNDS = 10;
 
 export const userService = {
   /**
-   * Create a new user, persist to DB, then publish a RabbitMQ event.
+   * Upsert local user profile from auth.created event payload.
    */
-  async createUser(dto: CreateUserDto) {
-    const existing = await prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-
-    if (existing) {
-      throw new Error("A user with that email already exists.");
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-
-    const user = await prisma.user.create({
-      data: {
+  async syncFromAuthCreated(dto: CreateUserDto) {
+    return prisma.user.upsert({
+      where: { id: dto.id },
+      update: {
         email: dto.email,
-        passwordHash,
+        name: dto.name,
+      },
+      create: {
+        id: dto.id,
+        email: dto.email,
         name: dto.name,
       },
       select: {
@@ -34,16 +25,6 @@ export const userService = {
         updatedAt: true,
       },
     });
-
-    // 🐇 Publish after successful DB write (fire-and-forget)
-    publishUserCreated({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      createdAt: user.createdAt.toISOString(),
-    });
-
-    return user;
   },
 
   /**

@@ -3,9 +3,6 @@ import { userController } from "./user.controller";
 
 const router = Router();
 
-// POST /users  — create a new user
-router.post("/", userController.createUser);
-
 // GET /users   — list all users
 router.get("/", userController.getAllUsers);
 

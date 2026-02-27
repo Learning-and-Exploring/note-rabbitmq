@@ -7,12 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String   @id @map("auth_id") // same UUID from auth-service
+model Auth {
+  id           String   @id @default(uuid())
   email        String   @unique
+  passwordHash String   @map("password_hash")
   name         String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  @@map("users")
+  @@map("auths")
 }

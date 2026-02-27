@@ -4,16 +4,16 @@ import { noteService } from "./note.service";
 export const noteController = {
   /**
    * POST /notes
-   * Body: { userId, title?, content? }
+   * Body: { authId, title?, content? }
    */
   async createNote(req: Request, res: Response) {
     try {
-      const { userId, title, content } = req.body;
-      if (!userId) {
-        res.status(400).json({ message: "userId is required." });
+      const { authId, title, content } = req.body;
+      if (!authId) {
+        res.status(400).json({ message: "authId is required." });
         return;
       }
-      const note = await noteService.createNote({ userId, title, content });
+      const note = await noteService.createNote({ authId, title, content });
       res.status(201).json({ message: "Note created.", data: note });
     } catch (err: any) {
       res
@@ -38,13 +38,13 @@ export const noteController = {
   },
 
   /**
-   * GET /notes/user/:userId
-   * Returns notes for a specific user.
+   * GET /notes/auth/:authId
+   * Returns notes for a specific auth.
    */
-  async getNotesByUser(req: Request, res: Response) {
+  async getNotesByAuth(req: Request, res: Response) {
     try {
-      const { userId } = req.params;
-      const notes = await noteService.getNotesByUser(userId as string);
+      const { authId } = req.params;
+      const notes = await noteService.getNotesByAuth(authId as string);
       res.status(200).json({ data: notes });
     } catch (err: any) {
       res

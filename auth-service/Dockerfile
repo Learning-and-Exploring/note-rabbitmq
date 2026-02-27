@@ -27,7 +27,7 @@ COPY package*.json ./
 # Generate Prisma client in the runner stage (uses real DATABASE_URL from docker-compose)
 RUN npx prisma generate
 
-EXPOSE 3004
+EXPOSE 3001
 
 # Run migrations then start the app
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

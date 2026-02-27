@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { authMiddleware } from "./middleware/auth.middleware";
-import userProxy from "./routes/user.proxy";
+import authProxy from "./routes/auth.proxy";
 import noteProxy from "./routes/note.proxy";
 
 const app = express();
@@ -14,7 +14,7 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 // ── Protected routes ─────────────────────────────────────────────────────────
-app.use("/users", authMiddleware, userProxy);
+app.use("/auths", authMiddleware, authProxy);
 app.use("/notes", authMiddleware, noteProxy);
 
 // ── 404 ──────────────────────────────────────────────────────────────────────

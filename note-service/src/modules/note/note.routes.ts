@@ -9,10 +9,10 @@ router.post("/", noteController.createNote);
 // GET /notes               — get all notes
 router.get("/", noteController.getAllNotes);
 
-// GET /notes/user/:userId  — get notes for a user
-router.get("/user/:userId", noteController.getNotesByUser);
+// GET /notes/auth/:authId  — get notes for a auth
+router.get("/auth/:authId", noteController.getNotesByAuth);
 
-// GET /notes/:id           — get a single note (must come after /user/:userId)
+// GET /notes/:id           — get a single note (must come after /auth/:authId)
 router.get("/:id", noteController.getNoteById);
 
 export default router;
