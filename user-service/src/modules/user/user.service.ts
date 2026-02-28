@@ -1,12 +1,19 @@
 import { prisma } from "../../shared/database";
 import { CreateUserDto } from "./user.model";
+import { publishUserCreated } from "../../events/publishers/user.publisher";
 
 export const userService = {
   /**
-   * Upsert local user profile from auth.created event payload.
+   * Sync local user profile from auth.created event payload.
+   * Publishes user.created only the first time a user is created.
    */
   async syncFromAuthCreated(dto: CreateUserDto) {
-    return prisma.user.upsert({
+    const existing = await prisma.user.findUnique({
+      where: { id: dto.id },
+      select: { id: true },
+    });
+
+    const user = await prisma.user.upsert({
       where: { id: dto.id },
       update: {
         email: dto.email,
@@ -25,6 +32,17 @@ export const userService = {
         updatedAt: true,
       },
     });
+
+    if (!existing) {
+      publishUserCreated({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        createdAt: user.createdAt.toISOString(),
+      });
+    }
+
+    return user;
   },
 
   /**

@@ -1,7 +1,7 @@
 import { noteService } from "../../modules/note/note.service";
 import { logger } from "../../shared/logger";
 
-interface AuthCreatedPayload {
+interface UserCreatedPayload {
   id: string;
   email: string;
   name?: string | null;
@@ -9,23 +9,21 @@ interface AuthCreatedPayload {
 }
 
 /**
- * Handle a `auth.created` RabbitMQ event.
- * 1. Upsert the SyncedAuth local copy
+ * Handle a `user.created` RabbitMQ event.
+ * 1. Upsert the SyncedAuth local copy (author identity)
  * 2. Create a default welcome Note
  */
-export async function handleAuthCreated(
-  payload: AuthCreatedPayload,
+export async function handleUserCreated(
+  payload: UserCreatedPayload,
 ): Promise<void> {
-  logger.info(`[EventHandler] Handling auth.created for auth ${payload.id}`);
+  logger.info(`[EventHandler] Handling user.created for user ${payload.id}`);
 
-  // 1. Sync the auth data locally
-  await noteService.upsertSyncedAuth({
+  await noteService.upsertSyncedUser({
     id: payload.id,
     email: payload.email,
     name: payload.name,
   });
 
-  // 2. Create a default welcome note
   await noteService.createNote({
     authId: payload.id,
     title: "Welcome! 🎉",
@@ -33,6 +31,6 @@ export async function handleAuthCreated(
   });
 
   logger.info(
-    `[EventHandler] Synced auth and created welcome note for ${payload.id}`,
+    `[EventHandler] Synced user and created welcome note for ${payload.id}`,
   );
 }

@@ -42,9 +42,9 @@ export const noteService = {
   },
 
   /**
-   * Upsert a synced auth (called by the RabbitMQ event handler).
+   * Upsert a synced user (called by the RabbitMQ event handler).
    */
-  async upsertSyncedAuth(data: {
+  async upsertSyncedUser(data: {
     id: string;
     email: string;
     name?: string | null;
