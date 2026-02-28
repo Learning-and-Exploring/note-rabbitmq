@@ -1,6 +1,9 @@
 import { ConsumeMessage } from "amqplib";
 import { getChannel, QUEUE_NAME } from "../../config/rabbitmq";
-import { handleUserCreated } from "../handlers/user.event.handler";
+import {
+  handleUserCreated,
+  handleUserEmailVerified,
+} from "../handlers/user.event.handler";
 import { logger } from "../../shared/logger";
 
 /**
@@ -22,6 +25,9 @@ export async function startUserConsumer(): Promise<void> {
       switch (routingKey) {
         case "user.created":
           await handleUserCreated(payload);
+          break;
+        case "user.email_verified":
+          await handleUserEmailVerified(payload);
           break;
         default:
           logger.warn(`[Consumer] Unhandled routing key: "${routingKey}"`);

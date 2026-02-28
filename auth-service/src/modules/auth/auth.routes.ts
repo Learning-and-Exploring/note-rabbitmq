@@ -9,6 +9,9 @@ router.post("/", authController.createAuth);
 // GET /auths   — list all auths
 router.get("/", authController.getAllAuths);
 
+// POST /auths/verify-email — verify email by token
+router.post("/verify-email", authController.verifyEmail);
+
 // GET /auths/:id — get a single auth by ID
 router.get("/:id", authController.getAuthById);
 

@@ -20,10 +20,12 @@ model Note {
 
 // Local shadow of Auth data — populated via RabbitMQ events, NOT a DB foreign key to auth-service
 model SyncedAuth {
-  id       String   @id // same UUID from auth-service
-  name     String?
-  email    String
-  syncedAt DateTime @default(now()) @map("synced_at")
+  id              String    @id // same UUID from auth-service
+  name            String?
+  email           String
+  isEmailVerified Boolean   @default(false) @map("is_email_verified")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  syncedAt        DateTime  @default(now()) @map("synced_at")
 
   @@map("synced_auths")
 }

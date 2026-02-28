@@ -8,11 +8,14 @@ datasource db {
 }
 
 model User {
-  id           String   @id @map("auth_id") // same UUID from auth-service
-  email        String   @unique
-  name         String?
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id              String    @id @map("auth_id") // same UUID from auth-service
+  email           String    @unique
+  name            String?
+  avatarUrl       String?   @map("avatar_url")
+  isEmailVerified Boolean   @default(false) @map("is_email_verified")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
 }

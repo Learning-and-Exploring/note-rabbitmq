@@ -1,6 +1,9 @@
 import { prisma } from "../../shared/database";
 import { CreateUserDto } from "./user.model";
-import { publishUserCreated } from "../../events/publishers/user.publisher";
+import {
+  publishUserCreated,
+  publishUserEmailVerified,
+} from "../../events/publishers/user.publisher";
 
 export const userService = {
   /**
@@ -23,11 +26,15 @@ export const userService = {
         id: dto.id,
         email: dto.email,
         name: dto.name,
+        isEmailVerified: false,
       },
       select: {
         id: true,
         email: true,
         name: true,
+        avatarUrl: true,
+        isEmailVerified: true,
+        emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -46,6 +53,57 @@ export const userService = {
   },
 
   /**
+   * Sync email verification status from auth.email_verified payload.
+   * Publishes user.email_verified only when transitioning to verified.
+   */
+  async syncEmailVerifiedFromAuth(data: {
+    id: string;
+    email: string;
+    verifiedAt: string;
+  }) {
+    const verifiedAt = new Date(data.verifiedAt);
+    const existing = await prisma.user.findUnique({
+      where: { id: data.id },
+      select: { id: true, isEmailVerified: true },
+    });
+
+    const user = await prisma.user.upsert({
+      where: { id: data.id },
+      update: {
+        email: data.email,
+        isEmailVerified: true,
+        emailVerifiedAt: verifiedAt,
+      },
+      create: {
+        id: data.id,
+        email: data.email,
+        isEmailVerified: true,
+        emailVerifiedAt: verifiedAt,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatarUrl: true,
+        isEmailVerified: true,
+        emailVerifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!existing?.isEmailVerified) {
+      publishUserEmailVerified({
+        id: user.id,
+        email: user.email,
+        verifiedAt: (user.emailVerifiedAt ?? verifiedAt).toISOString(),
+      });
+    }
+
+    return user;
+  },
+
+  /**
    * Return all users (safe fields only).
    */
   async getAllUsers() {
@@ -54,6 +112,9 @@ export const userService = {
         id: true,
         email: true,
         name: true,
+        avatarUrl: true,
+        isEmailVerified: true,
+        emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -71,6 +132,9 @@ export const userService = {
         id: true,
         email: true,
         name: true,
+        avatarUrl: true,
+        isEmailVerified: true,
+        emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
       },
