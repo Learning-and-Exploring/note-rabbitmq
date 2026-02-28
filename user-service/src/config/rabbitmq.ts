@@ -7,6 +7,7 @@ export const EXCHANGE_NAME = "auth.events";
 export const EXCHANGE_TYPE = "topic";
 export const QUEUE_NAME = "user-service.auth.events";
 export const ROUTING_KEY = "auth.*";
+export const USER_EXCHANGE_NAME = "user.events";
 
 // ── Singleton connection/channel ─────────────────────────────────────────────
 // amqplib v0.10+ returns ChannelModel from connect()
@@ -21,6 +22,9 @@ export async function connectRabbitMQ(): Promise<Channel> {
 
   // Mirror auth-service exchange and bind a dedicated consumer queue
   await channel.assertExchange(EXCHANGE_NAME, EXCHANGE_TYPE, { durable: true });
+  await channel.assertExchange(USER_EXCHANGE_NAME, EXCHANGE_TYPE, {
+    durable: true,
+  });
   await channel.assertQueue(QUEUE_NAME, { durable: true });
   await channel.bindQueue(QUEUE_NAME, EXCHANGE_NAME, ROUTING_KEY);
   channel.prefetch(1);

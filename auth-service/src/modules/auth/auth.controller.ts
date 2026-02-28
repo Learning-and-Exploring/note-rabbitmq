@@ -65,4 +65,36 @@ export const authController = {
       }
     }
   },
+
+  /**
+   * POST /auths/verify-email
+   * Verify auth email using token sent to inbox.
+   * Body: { token }
+   */
+  async verifyEmail(req: Request, res: Response) {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        res.status(400).json({ message: "token is required." });
+        return;
+      }
+
+      const result = await authService.verifyEmail({ token });
+      res.status(200).json({
+        message: "Email verified successfully.",
+        data: result,
+      });
+    } catch (error: any) {
+      if (error.message === "Invalid verification token.") {
+        res.status(400).json({ message: error.message });
+      } else if (error.message === "Verification token has expired.") {
+        res.status(410).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: error.message });
+      }
+    }
+  },
 };

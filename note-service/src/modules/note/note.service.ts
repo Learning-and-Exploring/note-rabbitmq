@@ -42,17 +42,56 @@ export const noteService = {
   },
 
   /**
-   * Upsert a synced auth (called by the RabbitMQ event handler).
+   * Upsert a synced user (called by the RabbitMQ event handler).
    */
-  async upsertSyncedAuth(data: {
+  async upsertSyncedUser(data: {
     id: string;
     email: string;
     name?: string | null;
+    isEmailVerified?: boolean;
+    emailVerifiedAt?: string | Date | null;
   }) {
+    const emailVerifiedAt = data.emailVerifiedAt
+      ? new Date(data.emailVerifiedAt)
+      : null;
+
     return prisma.syncedAuth.upsert({
       where: { id: data.id },
-      update: { email: data.email, name: data.name },
-      create: { id: data.id, email: data.email, name: data.name },
+      update: {
+        email: data.email,
+        name: data.name,
+        isEmailVerified: data.isEmailVerified ?? false,
+        emailVerifiedAt,
+      },
+      create: {
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        isEmailVerified: data.isEmailVerified ?? false,
+        emailVerifiedAt,
+      },
+    });
+  },
+
+  async markSyncedUserEmailVerified(data: {
+    id: string;
+    email: string;
+    verifiedAt: string;
+  }) {
+    const verifiedAt = new Date(data.verifiedAt);
+    return prisma.syncedAuth.upsert({
+      where: { id: data.id },
+      update: {
+        email: data.email,
+        isEmailVerified: true,
+        emailVerifiedAt: verifiedAt,
+      },
+      create: {
+        id: data.id,
+        email: data.email,
+        isEmailVerified: true,
+        emailVerifiedAt: verifiedAt,
+      },
     });
   },
 };

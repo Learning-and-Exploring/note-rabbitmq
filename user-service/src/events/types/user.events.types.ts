@@ -2,6 +2,7 @@
 export const USER_EVENTS = {
   CREATED: "user.created",
   UPDATED: "user.updated",
+  EMAIL_VERIFIED: "user.email_verified",
 } as const;
 
 export type UserEventName = (typeof USER_EVENTS)[keyof typeof USER_EVENTS];
@@ -21,5 +22,14 @@ export interface UserUpdatedPayload {
   updatedAt: string; // ISO 8601
 }
 
+export interface UserEmailVerifiedPayload {
+  id: string;
+  email: string;
+  verifiedAt: string; // ISO 8601
+}
+
 // Union type useful for typed consumers
-export type UserEventPayload = UserCreatedPayload | UserUpdatedPayload;
+export type UserEventPayload =
+  | UserCreatedPayload
+  | UserUpdatedPayload
+  | UserEmailVerifiedPayload;

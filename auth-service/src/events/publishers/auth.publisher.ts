@@ -1,5 +1,9 @@
 import { getChannel, EXCHANGE_NAME } from "../../config/rabbitmq";
-import { AUTH_EVENTS, AuthCreatedPayload } from "../types/auth.events.types";
+import {
+  AUTH_EVENTS,
+  AuthCreatedPayload,
+  AuthEmailVerifiedPayload,
+} from "../types/auth.events.types";
 import { logger } from "../../shared/logger";
 
 /**
@@ -20,5 +24,28 @@ export function publishAuthCreated(payload: AuthCreatedPayload): void {
     logger.info(`[Publisher] Published "${routingKey}" for auth ${payload.id}`);
   } catch (err: any) {
     logger.error("[Publisher] Failed to publish auth.created:", err.message);
+  }
+}
+
+/**
+ * Publish a `auth.email_verified` event to the RabbitMQ exchange.
+ * Routing key: "auth.email_verified"
+ */
+export function publishAuthEmailVerified(
+  payload: AuthEmailVerifiedPayload,
+): void {
+  try {
+    const channel = getChannel();
+    const routingKey = AUTH_EVENTS.EMAIL_VERIFIED;
+    const content = Buffer.from(JSON.stringify(payload));
+
+    channel.publish(EXCHANGE_NAME, routingKey, content, {
+      persistent: true,
+      contentType: "application/json",
+    });
+
+    logger.info(`[Publisher] Published "${routingKey}" for auth ${payload.id}`);
+  } catch (err: any) {
+    logger.error("[Publisher] Failed to publish auth.email_verified:", err.message);
   }
 }
