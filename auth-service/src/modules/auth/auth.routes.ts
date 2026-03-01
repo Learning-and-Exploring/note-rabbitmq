@@ -18,8 +18,11 @@ router.post("/logout", authController.logout);
 // GET /auths   — list all auths
 router.get("/", authController.getAllAuths);
 
-// POST /auths/verify-email — verify email by token
+// POST /auths/verify-email — verify email by OTP
 router.post("/verify-email", authController.verifyEmail);
+
+// POST /auths/resend-otp — resend email verification OTP
+router.post("/resend-otp", authController.resendVerificationOtp);
 
 // GET /auths/:id — get a single auth by ID
 router.get("/:id", authController.getAuthById);

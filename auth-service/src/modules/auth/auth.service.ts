@@ -6,6 +6,7 @@ import {
   LoginAuthDto,
   LogoutDto,
   RefreshTokenDto,
+  ResendEmailOtpDto,
   VerifyEmailDto,
 } from "./auth.model";
 import {
@@ -19,16 +20,45 @@ import {
   getRefreshTokenExpiryDate,
   hashRefreshToken,
 } from "../../shared/token";
+import { sendVerificationOtpEmail } from "../../shared/smtp";
+import { env } from "../../config/env";
 
 const SALT_ROUNDS = 10;
-const EMAIL_VERIFY_TTL_HOURS = 24;
+const DEFAULT_EMAIL_OTP_TTL_MINUTES = 5;
+const DEFAULT_EMAIL_OTP_MAX_ATTEMPTS = 5;
+const DEFAULT_EMAIL_OTP_RESEND_COOLDOWN_SECONDS = 60;
 
-function generateVerificationToken(): string {
-  return crypto.randomBytes(32).toString("hex");
+function readPositiveInt(raw: string, fallback: number): number {
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-function hashToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
+function getEmailOtpTtlMinutes(): number {
+  return readPositiveInt(env.EMAIL_OTP_TTL_MINUTES, DEFAULT_EMAIL_OTP_TTL_MINUTES);
+}
+
+function getEmailOtpMaxAttempts(): number {
+  return readPositiveInt(env.EMAIL_OTP_MAX_ATTEMPTS, DEFAULT_EMAIL_OTP_MAX_ATTEMPTS);
+}
+
+function getEmailOtpResendCooldownSeconds(): number {
+  return readPositiveInt(
+    env.EMAIL_OTP_RESEND_COOLDOWN_SECONDS,
+    DEFAULT_EMAIL_OTP_RESEND_COOLDOWN_SECONDS,
+  );
+}
+
+function generateOtpCode(): string {
+  const code = crypto.randomInt(0, 1_000_000);
+  return code.toString().padStart(6, "0");
+}
+
+function hashOtp(otp: string): string {
+  return crypto.createHash("sha256").update(otp).digest("hex");
+}
+
+function getOtpExpiryDate(): Date {
+  return new Date(Date.now() + getEmailOtpTtlMinutes() * 60 * 1000);
 }
 
 export const authService = {
@@ -45,19 +75,20 @@ export const authService = {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const verificationToken = generateVerificationToken();
-    const verificationTokenHash = hashToken(verificationToken);
-    const verificationExpiresAt = new Date(
-      Date.now() + EMAIL_VERIFY_TTL_HOURS * 60 * 60 * 1000,
-    );
+    const otp = generateOtpCode();
+    const otpHash = hashOtp(otp);
+    const otpExpiresAt = getOtpExpiryDate();
+    const otpSentAt = new Date();
 
     const auth = await prisma.auth.create({
       data: {
         email: dto.email,
         passwordHash,
         name: dto.name,
-        emailVerificationTokenHash: verificationTokenHash,
-        emailVerificationExpiresAt: verificationExpiresAt,
+        emailVerificationOtpHash: otpHash,
+        emailVerificationOtpExpiresAt: otpExpiresAt,
+        emailVerificationOtpAttempts: 0,
+        emailVerificationOtpSentAt: otpSentAt,
       },
       select: {
         id: true,
@@ -69,7 +100,19 @@ export const authService = {
       },
     });
 
-    // 🐇 Publish after successful DB write (fire-and-forget)
+    try {
+      await sendVerificationOtpEmail({
+        to: auth.email,
+        name: auth.name,
+        otp,
+        expiresInMinutes: getEmailOtpTtlMinutes(),
+      });
+    } catch (error) {
+      await prisma.auth.delete({ where: { id: auth.id } });
+      throw error;
+    }
+
+    // Publish after successful DB write + OTP dispatch.
     publishAuthCreated({
       id: auth.id,
       email: auth.email,
@@ -80,52 +123,72 @@ export const authService = {
 
     return {
       ...auth,
-      verificationToken,
-      verificationExpiresAt,
+      verificationOtpSent: true,
+      verificationOtpExpiresAt: otpExpiresAt,
     };
   },
 
   /**
-   * Verify email by token and emit auth.email_verified.
+   * Verify email by OTP and emit auth.email_verified.
    */
   async verifyEmail(dto: VerifyEmailDto) {
-    const tokenHash = hashToken(dto.token);
     const now = new Date();
 
-    const auth = await prisma.auth.findFirst({
+    const auth = await prisma.auth.findUnique({
       where: {
-        emailVerificationTokenHash: tokenHash,
+        email: dto.email,
       },
       select: {
         id: true,
         email: true,
-        emailVerificationExpiresAt: true,
+        emailVerificationOtpHash: true,
+        emailVerificationOtpExpiresAt: true,
+        emailVerificationOtpAttempts: true,
         emailVerifiedAt: true,
       },
     });
 
     if (!auth) {
-      throw new Error("Invalid verification token.");
-    }
-
-    if (!auth.emailVerificationExpiresAt || auth.emailVerificationExpiresAt < now) {
-      throw new Error("Verification token has expired.");
+      throw new Error("Invalid email or OTP.");
     }
 
     if (auth.emailVerifiedAt) {
-      return {
-        id: auth.id,
-        email: auth.email,
-        emailVerifiedAt: auth.emailVerifiedAt,
-      };
+      throw new Error("Email is already verified.");
+    }
+
+    if (auth.emailVerificationOtpAttempts >= getEmailOtpMaxAttempts()) {
+      throw new Error("Too many OTP attempts. Please request a new OTP.");
+    }
+
+    if (
+      !auth.emailVerificationOtpHash ||
+      !auth.emailVerificationOtpExpiresAt ||
+      auth.emailVerificationOtpExpiresAt < now
+    ) {
+      throw new Error("Verification OTP has expired.");
+    }
+
+    const incomingOtpHash = hashOtp(dto.otp);
+    if (incomingOtpHash !== auth.emailVerificationOtpHash) {
+      await prisma.auth.update({
+        where: { id: auth.id },
+        data: {
+          emailVerificationOtpAttempts: {
+            increment: 1,
+          },
+        },
+      });
+      throw new Error("Invalid email or OTP.");
     }
 
     const updated = await prisma.auth.update({
       where: { id: auth.id },
       data: {
         emailVerifiedAt: now,
-        emailVerificationTokenHash: null,
-        emailVerificationExpiresAt: null,
+        emailVerificationOtpHash: null,
+        emailVerificationOtpExpiresAt: null,
+        emailVerificationOtpAttempts: 0,
+        emailVerificationOtpSentAt: null,
       },
       select: {
         id: true,
@@ -141,6 +204,63 @@ export const authService = {
     });
 
     return updated;
+  },
+
+  /**
+   * Resend verification OTP.
+   */
+  async resendVerificationOtp(dto: ResendEmailOtpDto) {
+    const now = new Date();
+    const auth = await prisma.auth.findUnique({
+      where: { email: dto.email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        emailVerifiedAt: true,
+        emailVerificationOtpSentAt: true,
+      },
+    });
+
+    // Do not reveal whether email exists.
+    if (!auth) {
+      return { sent: true };
+    }
+
+    if (auth.emailVerifiedAt) {
+      throw new Error("Email is already verified.");
+    }
+
+    const cooldownMs = getEmailOtpResendCooldownSeconds() * 1000;
+    if (
+      auth.emailVerificationOtpSentAt &&
+      now.getTime() - auth.emailVerificationOtpSentAt.getTime() < cooldownMs
+    ) {
+      throw new Error("Please wait before requesting another OTP.");
+    }
+
+    const otp = generateOtpCode();
+    const otpHash = hashOtp(otp);
+    const otpExpiresAt = getOtpExpiryDate();
+
+    await sendVerificationOtpEmail({
+      to: auth.email,
+      name: auth.name,
+      otp,
+      expiresInMinutes: getEmailOtpTtlMinutes(),
+    });
+
+    await prisma.auth.update({
+      where: { id: auth.id },
+      data: {
+        emailVerificationOtpHash: otpHash,
+        emailVerificationOtpExpiresAt: otpExpiresAt,
+        emailVerificationOtpAttempts: 0,
+        emailVerificationOtpSentAt: now,
+      },
+    });
+
+    return { sent: true };
   },
 
   /**
@@ -169,9 +289,9 @@ export const authService = {
       throw new Error("Invalid email or password.");
     }
 
-    // if (!auth.emailVerifiedAt) {
-    //   throw new Error("Email is not verified. Please verify your email first.");
-    // }
+    if (!auth.emailVerifiedAt) {
+      throw new Error("Email is not verified. Please verify your email first.");
+    }
 
     const refreshToken = createRefreshToken();
     const refreshTokenHash = hashRefreshToken(refreshToken);

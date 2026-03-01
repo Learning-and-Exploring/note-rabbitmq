@@ -156,28 +156,67 @@ export const authController = {
 
   /**
    * POST /auths/verify-email
-   * Verify auth email using token sent to inbox.
-   * Body: { token }
+   * Verify auth email using OTP sent to inbox.
+   * Body: { email, otp }
    */
   async verifyEmail(req: Request, res: Response) {
     try {
-      const { token } = req.body;
+      const { email, otp } = req.body;
 
-      if (!token) {
-        res.status(400).json({ message: "token is required." });
+      if (!email || !otp) {
+        res.status(400).json({ message: "email and otp are required." });
         return;
       }
 
-      const result = await authService.verifyEmail({ token });
+      const result = await authService.verifyEmail({ email, otp });
       res.status(200).json({
         message: "Email verified successfully.",
         data: result,
       });
     } catch (error: any) {
-      if (error.message === "Invalid verification token.") {
+      if (error.message === "Invalid email or OTP.") {
         res.status(400).json({ message: error.message });
-      } else if (error.message === "Verification token has expired.") {
+      } else if (error.message === "Verification OTP has expired.") {
         res.status(410).json({ message: error.message });
+      } else if (error.message === "Too many OTP attempts. Please request a new OTP.") {
+        res.status(429).json({ message: error.message });
+      } else if (error.message === "Email is already verified.") {
+        res.status(409).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: error.message });
+      }
+    }
+  },
+
+  /**
+   * POST /auths/resend-otp
+   * Resend OTP for email verification.
+   * Body: { email }
+   */
+  async resendVerificationOtp(req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({ message: "email is required." });
+        return;
+      }
+
+      const result = await authService.resendVerificationOtp({ email });
+      res.status(200).json({
+        message: "If the account exists, a new OTP has been sent.",
+        data: result,
+      });
+    } catch (error: any) {
+      if (
+        error.message === "Please wait before requesting another OTP." ||
+        error.message === "Too many OTP attempts. Please request a new OTP."
+      ) {
+        res.status(429).json({ message: error.message });
+      } else if (error.message === "Email is already verified.") {
+        res.status(409).json({ message: error.message });
       } else {
         res
           .status(500)

@@ -13,6 +13,7 @@ function isPublicAuthRoute(req: Request): boolean {
   if (req.method === "POST" && path === "/auths/refresh") return true;
   if (req.method === "POST" && path === "/auths/logout") return true;
   if (req.method === "POST" && path === "/auths/verify-email") return true;
+  if (req.method === "POST" && path === "/auths/resend-otp") return true;
   if (req.method === "GET" && path === "/auths/health") return true;
   return false;
 }
