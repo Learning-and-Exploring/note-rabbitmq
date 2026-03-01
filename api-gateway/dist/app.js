@@ -9,7 +9,6 @@ const auth_proxy_1 = __importDefault(require("./routes/auth.proxy"));
 const user_proxy_1 = __importDefault(require("./routes/user.proxy"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT ?? 3000;
-app.use(express_1.default.json());
 // ── Health check (no auth required) ─────────────────────────────────────────
 app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok", service: "api-gateway" });

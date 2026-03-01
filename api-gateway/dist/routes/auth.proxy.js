@@ -10,7 +10,8 @@ const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL ?? "http://localhost:3001"
 router.use("/", (0, http_proxy_middleware_1.createProxyMiddleware)({
     target: AUTH_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: { "^/auths": "/auths" },
+    // Router is already mounted at /auths, so prepend it back for upstream.
+    pathRewrite: (path) => `/auths${path}`,
     on: {
         error: (err, _req, res) => {
             console.error("[Gateway] auth-service proxy error:", err.message);
