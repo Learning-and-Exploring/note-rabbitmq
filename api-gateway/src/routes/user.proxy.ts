@@ -4,7 +4,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 const router = Router();
 
 const USER_SERVICE_URL =
-  process.env.USER_SERVICE_URL ?? "http://localhost:3004";
+  process.env.USER_SERVICE_URL ?? "http://localhost:3002";
 
 /**
  * Proxy all /users/* requests to user-service.

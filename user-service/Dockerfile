@@ -27,7 +27,7 @@ COPY package*.json ./
 # Generate Prisma client in the runner stage (uses real DATABASE_URL from docker-compose)
 RUN npx prisma generate
 
-EXPOSE 3004
+EXPOSE 3002
 
 # Sync schema then start the app (project currently has no prisma/migrations)
 CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
