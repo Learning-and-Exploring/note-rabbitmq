@@ -1,0 +1,36 @@
+services:
+  auth-service:
+    command: sh -c "npx prisma db push && npm run dev"
+    environment:
+      NODE_ENV: development
+      ACCESS_TOKEN_SECRET: super_secret_access_key_change_me
+      ACCESS_TOKEN_TTL_SECONDS: 900
+      REFRESH_TOKEN_TTL_DAYS: 7
+    volumes:
+      - ./auth-service:/app
+      - /app/node_modules
+
+  user-service:
+    command: sh -c "npx prisma db push && npm run dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./user-service:/app
+      - /app/node_modules
+
+  note-service:
+    command: sh -c "npx prisma db push && npm run dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./note-service:/app
+      - /app/node_modules
+
+  api-gateway:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      ACCESS_TOKEN_SECRET: super_secret_access_key_change_me
+    volumes:
+      - ./api-gateway:/app
+      - /app/node_modules

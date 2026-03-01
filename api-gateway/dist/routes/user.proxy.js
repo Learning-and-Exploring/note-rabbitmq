@@ -10,7 +10,8 @@ const USER_SERVICE_URL = process.env.USER_SERVICE_URL ?? "http://localhost:3002"
 router.use("/", (0, http_proxy_middleware_1.createProxyMiddleware)({
     target: USER_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: { "^/users": "/users" },
+    // Router is already mounted at /users, so prepend it back for upstream.
+    pathRewrite: (path) => `/users${path}`,
     on: {
         error: (err, _req, res) => {
             console.error("[Gateway] user-service proxy error:", err.message);

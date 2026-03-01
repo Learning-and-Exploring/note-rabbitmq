@@ -14,7 +14,8 @@ router.use(
   createProxyMiddleware({
     target: AUTH_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: { "^/auths": "/auths" },
+    // Router is already mounted at /auths, so prepend it back for upstream.
+    pathRewrite: (path) => `/auths${path}`,
     on: {
       error: (err, _req, res) => {
         console.error("[Gateway] auth-service proxy error:", err.message);

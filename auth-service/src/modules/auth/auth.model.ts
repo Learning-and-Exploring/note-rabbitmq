@@ -16,3 +16,16 @@ export interface GetAuthDto {
 export interface VerifyEmailDto {
   token: string;
 }
+
+export interface LoginAuthDto {
+  email: string;
+  password: string;
+}
+
+export interface RefreshTokenDto {
+  refreshToken: string;
+}
+
+export interface LogoutDto {
+  refreshToken: string;
+}

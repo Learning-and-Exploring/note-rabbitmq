@@ -4,7 +4,7 @@
   "description": "Note service - manages notes, syncs auth data via RabbitMQ",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node src/server.ts",
+    "dev": "node --watch -r ts-node/register src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",

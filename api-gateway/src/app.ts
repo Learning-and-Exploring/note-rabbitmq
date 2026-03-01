@@ -6,8 +6,6 @@ import userProxy from "./routes/user.proxy";
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 
-app.use(express.json());
-
 // ── Health check (no auth required) ─────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok", service: "api-gateway" });

@@ -4,7 +4,7 @@
   "description": "API Gateway — proxies requests to auth-service and user-service",
   "main": "dist/app.js",
   "scripts": {
-    "dev": "ts-node src/app.ts",
+    "dev": "node --watch -r ts-node/register src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js"
   },
