@@ -1,168 +1,183 @@
-# Folder Structure of Even Driven Architecture
+# Event-Driven Microservices with RabbitMQ
 
-<h3>🛠 Tech Stack ⚛</h3>
+This repository implements a Node.js + TypeScript event-driven architecture with:
 
----
+- `auth-service`
+- `user-service`
+- `note-service`
+- `api-gateway`
+- RabbitMQ
+- PostgreSQL (database-per-service)
 
-<p align="center">
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nodejs/nodejs-original.svg" alt="Node.js" width="50" height="50" title="Node.js" />
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/typescript/typescript-original.svg" alt="TypeScript" width="50" height="50" title="TypeScript" />
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/express/express-original.svg" alt="Express" width="50" height="50" title="Express.js" />
-  
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original.svg" alt="Docker" width="50" height="50" title="Docker" />
-  <img src="https://cdn.simpleicons.org/rabbitmq/FF6600" alt="RabbitMQ" width="50" height="50" title="RabbitMQ" />
-  
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/mongodb/mongodb-original.svg" alt="MongoDB" width="50" height="50" title="MongoDB" />
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/postgresql/postgresql-original.svg" alt="PostgreSQL" width="50" height="50" title="PostgreSQL" />
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/redis/redis-original.svg" alt="Redis" width="50" height="50" title="Redis" />
-  
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/jest/jest-plain.svg" alt="Jest" width="50" height="50" title="Jest" />
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/eslint/eslint-original.svg" alt="ESLint" width="50" height="50" title="ESLint" />
-  <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/githubactions/githubactions-original.svg" alt="GitHub Actions" width="50" height="50" title="GitHub Actions" />
-</p>
+The current implementation is:
 
----
+- `auth-service` publishes `auth.created` and `auth.email_verified`
+- `user-service` consumes auth events, syncs local users, then publishes `user.created` and `user.email_verified`
+- `note-service` consumes user events, syncs `SyncedAuth`, and creates a welcome note on `user.created`
+- `api-gateway` proxies only `/auths` and `/users`
 
-<div align="center">
-  <h2>Micro Service Architecture</h2>
-</div>
-
-A scalable, event-driven microservices architecture built with **Node.js** and **TypeScript**. This project demonstrates asynchronous communication between services using **RabbitMQ** to decouple business logic and ensure high availability.
-
----
-
-## 🏗 System Architecture
-
-The application is split into distinct domain services. Communication is handled via REST APIs for synchronous operations and RabbitMQ for asynchronous event propagation.
-
-### The Flow
-
-1.  **Auth Service**: Handles auth authentication and management. When a auth state changes (e.g., created, updated), it **publishes** an event to the message broker.
-2.  **RabbitMQ**: Acts as the message broker, routing events to the appropriate queues.
-3.  **Note Service**: Manages auth notes. It **consumes** auth events to maintain data consistency (e.g., creating a default welcome note when a new auth registers).
+## Architecture
 
 ```mermaid
 graph LR
-    %% Custom Styles
-    classDef client fill:#2b2d31,stroke:#5865f2,stroke-width:2px,color:#fff,rx:8,ry:8
-    classDef service fill:#339933,stroke:#236b23,stroke-width:2px,color:#fff,rx:8,ry:8
-    classDef db fill:#007ACC,stroke:#005999,stroke-width:2px,color:#fff,rx:8,ry:8
-    classDef broker fill:#FF6600,stroke:#cc5200,stroke-width:2px,color:#fff,rx:15,ry:15
-    classDef queue fill:#2496ED,stroke:#1a75c2,stroke-width:2px,color:#fff,rx:4,ry:4
+  C[Client]
+  G[API Gateway :3000]
+  A[Auth Service :3001]
+  U[User Service :3002]
+  N[Note Service :3003]
 
-    %% Nodes
-    A[👤 Client]:::client
-    B(⚙️ Auth Service):::service
-    B_DB[(🗄️ Auth DB)]:::db
-    C{🐇 Exchange}:::broker
-    D[📨 Auth Queue]:::queue
-    E(⚙️ Note Service):::service
-    E_DB[(🗄️ Note DB)]:::db
+  ADB[(auth_service_db :5433)]
+  UDB[(user_service_db :5435)]
+  NDB[(note_service_db :5434)]
 
-    %% Edges
-    A -->|HTTP POST| B
-    B -->|Persist| B_DB
-    B ==>|Publish Event| C
-    C -.->|Route| D
-    D ==>|Consume| E
-    E -->|Save| E_DB
+  AX{{auth.events}}
+  UX{{user.events}}
 
-    %% Highlight the RabbitMQ Event Path
-    linkStyle 2 stroke:#FF6600,stroke-width:3px
-    linkStyle 3 stroke:#FF6600,stroke-width:2px,stroke-dasharray: 5 5
-    linkStyle 4 stroke:#FF6600,stroke-width:3px
+  C --> G
+  G -->|/auths| A
+  G -->|/users| U
+  C -->|/notes direct| N
+
+  A --> ADB
+  U --> UDB
+  N --> NDB
+
+  A -->|auth.created / auth.email_verified| AX
+  AX -->|auth.*| U
+  U -->|user.created / user.email_verified| UX
+  UX -->|user.*| N
 ```
 
-```
-app/.
-├──  api-gateway
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── src
-│   │   ├── app.ts
-│   │   ├── middleware
-│   │   │   └── auth.middleware.ts
-│   │   └── routes
-│   │       ├── note.proxy.ts
-│   │       └── auth.proxy.ts
-│   └── tsconfig.json
-├── DATABASE.md
-├── docker-compose.yml
-├── note-service
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── prisma
-│   │   └── schema.prisma
-│   ├── src
-│   │   ├── app.ts
-│   │   ├── config
-│   │   │   ├── env.ts
-│   │   │   └── rabbitmq.ts
-│   │   ├── events
-│   │   │   ├── consumers
-│   │   │   │   └── auth.consumer.ts
-│   │   │   └── handlers
-│   │   │       └── auth.event.handler.ts
-│   │   ├── modules
-│   │   │   └── note
-│   │   │       ├── note.controller.ts
-│   │   │       ├── note.model.ts
-│   │   │       ├── note.routes.ts
-│   │   │       └── note.service.ts
-│   │   ├── server.ts
-│   │   └── shared
-│   │       ├── database.ts
-│   │       └── logger.ts
-│   └── tsconfig.json
-├── README.md
-└── auth-service
-    ├── Dockerfile
-    ├── package.json
-    ├── package-lock.json
-    ├── prisma
-    │   └── schema.prisma
-    ├── src
-    │   ├── app.ts
-    │   ├── config
-    │   │   ├── env.ts
-    │   │   └── rabbitmq.ts
-    │   ├── events
-    │   │   ├── publishers
-    │   │   │   └── auth.publisher.ts
-    │   │   └── types
-    │   │       └── auth.events.types.ts
-    │   ├── modules
-    │   │   └── auth
-    │   │       ├── auth.controller.ts
-    │   │       ├── auth.events.ts
-    │   │       ├── auth.model.ts
-    │   │       ├── auth.routes.ts
-    │   │       └── auth.service.ts
-    │   ├── server.ts
-    │   └── shared
-    │       ├── database.ts
-    │       └── logger.ts
-    └── tsconfig.json
+## Virtual DB Diagram
 
+This is the logical (virtual) DB view from your running code.
 
+```mermaid
+erDiagram
+  AUTHS {
+    string id PK
+    string email UK
+    string password_hash
+    string name
+    datetime email_verified_at
+    string email_verification_token_hash
+    datetime email_verification_expires_at
+    datetime created_at
+    datetime updated_at
+  }
+
+  USERS {
+    string auth_id PK
+    string email UK
+    string name
+    string avatar_url
+    boolean is_email_verified
+    datetime email_verified_at
+    datetime created_at
+    datetime updated_at
+  }
+
+  NOTES {
+    string id PK
+    string auth_id
+    string title
+    string content
+    datetime created_at
+    datetime updated_at
+  }
+
+  SYNCED_AUTHS {
+    string id PK
+    string email
+    string name
+    boolean is_email_verified
+    datetime email_verified_at
+    datetime synced_at
+  }
+
+  AUTHS ||..|| USERS : "event sync via RabbitMQ"
+  USERS ||..o{ NOTES : "auth_id ownership"
+  USERS ||..|| SYNCED_AUTHS : "event sync via RabbitMQ"
 ```
 
----
+Notes:
 
-## 🚧 Next Steps
+- There are no cross-database foreign keys between services.
+- `user-service.User.id` maps to `auth_id` and uses the same UUID produced by `auth-service`.
+- `note-service.Note.auth_id` is a plain column, not a DB FK to another service DB.
 
-The following steps are needed to complete the project end-to-end:
+## Services and Ports
 
-1. **Fill in service code** — implement `server.ts`, `app.ts`, routes, controllers, and services in both `auth-service` and `note-service`
-2. **Set up RabbitMQ connection** — configure `config/rabbitmq.ts` in each service (connect, declare exchange & queues)
-3. **Publish events** — in `auth-service`, after a auth is created/updated, publish a `auth.created` event to RabbitMQ
-4. **Consume events** — in `note-service`, listen for `auth.created`, then create a `SyncedAuth` record + a default welcome `Note`
-5. **Run migrations** — once Postgres is up via Docker, run `npm run db:migrate` in each service to create the tables
-6. **Wire up the API Gateway** — `api-gateway` proxies requests to the correct service
-7. **Run & test** — `docker compose up --build`, then hit the endpoints to verify the full event-driven flow
+| Component      | Container/Service | Host Port | Internal Port |
+| --- | --- | --- | --- |
+| API Gateway    | `api-gateway` | `3000` | `3000` |
+| Auth Service   | `auth-service` | `3001` | `3001` |
+| User Service   | `user-service` | `3002` | `3002` |
+| Note Service   | `note-service` | `3003` | `3003` |
+| RabbitMQ AMQP  | `rabbitmq` | `5672` | `5672` |
+| RabbitMQ UI    | `rabbitmq` | `15672` | `15672` |
+| Auth DB        | `auth-db` | `5433` | `5432` |
+| Note DB        | `note-db` | `5434` | `5432` |
+| User DB        | `user-db` | `5435` | `5432` |
 
-> Build order: **DB → RabbitMQ config → auth-service → note-service → gateway → test**
+## API Endpoints (Current)
 
----
+Gateway routes:
+
+- `GET /health`
+- `POST /auths`
+- `GET /auths`
+- `GET /auths/:id`
+- `POST /auths/verify-email`
+- `GET /users`
+- `GET /users/:id`
+
+Direct note-service routes (not proxied by gateway in current code):
+
+- `POST /notes`
+- `GET /notes`
+- `GET /notes/auth/:authId`
+- `GET /notes/:id`
+- `GET /health` on note-service
+
+## RabbitMQ Topology
+
+- Exchange: `auth.events` (topic)
+- Queue: `user-service.auth.events`
+- Binding key: `auth.*`
+
+- Exchange: `user.events` (topic)
+- Queue: `note-service.user.events`
+- Binding key: `user.*`
+
+## Run with Docker
+
+From project root:
+
+```bash
+docker compose up --build
+```
+
+RabbitMQ UI:
+
+- `http://localhost:15672`
+- user: `guest`
+- password: `guest`
+
+## Local Prisma Commands
+
+Run inside each service folder (`auth-service`, `user-service`, `note-service`):
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:studio
+```
+
+## Event Flow Example
+
+1. Call `POST /auths` (via gateway or directly to auth-service).
+2. `auth-service` stores in `auth_service_db.auths` and publishes `auth.created`.
+3. `user-service` consumes `auth.created`, upserts `user_service_db.users`, and publishes `user.created`.
+4. `note-service` consumes `user.created`, upserts `note_service_db.synced_auths`, and creates a welcome row in `note_service_db.notes`.
+
