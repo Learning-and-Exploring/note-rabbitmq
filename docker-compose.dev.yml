@@ -1,0 +1,32 @@
+services:
+  auth-service:
+    command: sh -c "npx prisma db push && npm run dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./auth-service:/app
+      - /app/node_modules
+
+  user-service:
+    command: sh -c "npx prisma db push && npm run dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./user-service:/app
+      - /app/node_modules
+
+  note-service:
+    command: sh -c "npx prisma db push && npm run dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./note-service:/app
+      - /app/node_modules
+
+  api-gateway:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./api-gateway:/app
+      - /app/node_modules
