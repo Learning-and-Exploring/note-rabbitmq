@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "../../shared/database";
-import { CreateAuthDto, VerifyEmailDto } from "./auth.model";
+import { CreateAuthDto, LoginAuthDto, VerifyEmailDto } from "./auth.model";
 import {
   publishAuthCreated,
   publishAuthEmailVerified,
@@ -128,6 +128,46 @@ export const authService = {
     });
 
     return updated;
+  },
+
+  /**
+   * Login with email and password.
+   */
+  async login(dto: LoginAuthDto) {
+    const auth = await prisma.auth.findUnique({
+      where: { email: dto.email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        passwordHash: true,
+        emailVerifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!auth) {
+      throw new Error("Invalid email or password.");
+    }
+
+    const passwordMatch = await bcrypt.compare(dto.password, auth.passwordHash);
+    if (!passwordMatch) {
+      throw new Error("Invalid email or password.");
+    }
+
+    if (!auth.emailVerifiedAt) {
+      throw new Error("Email is not verified. Please verify your email first.");
+    }
+
+    return {
+      id: auth.id,
+      email: auth.email,
+      name: auth.name,
+      emailVerifiedAt: auth.emailVerifiedAt,
+      createdAt: auth.createdAt,
+      updatedAt: auth.updatedAt,
+    };
   },
 
   /**

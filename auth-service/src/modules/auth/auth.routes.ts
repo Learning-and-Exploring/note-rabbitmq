@@ -6,6 +6,9 @@ const router = Router();
 // POST /auths  — create a new auth
 router.post("/", authController.createAuth);
 
+// POST /auths/login — login with email + password
+router.post("/login", authController.login);
+
 // GET /auths   — list all auths
 router.get("/", authController.getAllAuths);
 
