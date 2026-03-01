@@ -63,6 +63,63 @@ export const authController = {
   },
 
   /**
+   * POST /auths/refresh
+   * Rotate refresh token and issue a new access token.
+   * Body: { refreshToken }
+   */
+  async refreshToken(req: Request, res: Response) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        res.status(400).json({ message: "refreshToken is required." });
+        return;
+      }
+
+      const tokenBundle = await authService.refreshToken({ refreshToken });
+      res.status(200).json({
+        message: "Token refreshed successfully.",
+        data: tokenBundle,
+      });
+    } catch (error: any) {
+      if (error.message === "Invalid refresh token.") {
+        res.status(401).json({ message: error.message });
+      } else if (error.message === "Refresh token has expired.") {
+        res.status(401).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: error.message });
+      }
+    }
+  },
+
+  /**
+   * POST /auths/logout
+   * Revoke refresh token.
+   * Body: { refreshToken }
+   */
+  async logout(req: Request, res: Response) {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) {
+        res.status(400).json({ message: "refreshToken is required." });
+        return;
+      }
+
+      const result = await authService.logout({ refreshToken });
+      res.status(200).json({
+        message: "Logout completed.",
+        data: result,
+      });
+    } catch (error: any) {
+      res
+        .status(500)
+        .json({ message: "Internal server error.", detail: error.message });
+    }
+  },
+
+  /**
    * GET /auths
    * Return all auths.
    */

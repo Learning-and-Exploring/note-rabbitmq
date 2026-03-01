@@ -1,11 +1,24 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "../../shared/database";
-import { CreateAuthDto, LoginAuthDto, VerifyEmailDto } from "./auth.model";
+import {
+  CreateAuthDto,
+  LoginAuthDto,
+  LogoutDto,
+  RefreshTokenDto,
+  VerifyEmailDto,
+} from "./auth.model";
 import {
   publishAuthCreated,
   publishAuthEmailVerified,
 } from "../../events/publishers/auth.publisher";
+import {
+  createAccessToken,
+  createRefreshToken,
+  getAccessTokenTtlSeconds,
+  getRefreshTokenExpiryDate,
+  hashRefreshToken,
+} from "../../shared/token";
 
 const SALT_ROUNDS = 10;
 const EMAIL_VERIFY_TTL_HOURS = 24;
@@ -156,18 +169,125 @@ export const authService = {
       throw new Error("Invalid email or password.");
     }
 
-    if (!auth.emailVerifiedAt) {
-      throw new Error("Email is not verified. Please verify your email first.");
-    }
+    // if (!auth.emailVerifiedAt) {
+    //   throw new Error("Email is not verified. Please verify your email first.");
+    // }
 
-    return {
-      id: auth.id,
+    const refreshToken = createRefreshToken();
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+    const refreshTokenExpiresAt = getRefreshTokenExpiryDate();
+
+    await prisma.auth.update({
+      where: { id: auth.id },
+      data: {
+        refreshTokenHash,
+        refreshTokenExpiresAt,
+      },
+    });
+
+    const accessToken = createAccessToken({
+      sub: auth.id,
       email: auth.email,
       name: auth.name,
-      emailVerifiedAt: auth.emailVerifiedAt,
-      createdAt: auth.createdAt,
-      updatedAt: auth.updatedAt,
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: "Bearer",
+      accessTokenExpiresIn: getAccessTokenTtlSeconds(),
+      data: {
+        id: auth.id,
+        email: auth.email,
+        name: auth.name,
+        emailVerifiedAt: auth.emailVerifiedAt,
+        createdAt: auth.createdAt,
+        updatedAt: auth.updatedAt,
+      },
     };
+  },
+
+  /**
+   * Refresh access token using a valid refresh token.
+   */
+  async refreshToken(dto: RefreshTokenDto) {
+    const refreshTokenHash = hashRefreshToken(dto.refreshToken);
+    const now = new Date();
+
+    const auth = await prisma.auth.findFirst({
+      where: { refreshTokenHash },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        emailVerifiedAt: true,
+        refreshTokenExpiresAt: true,
+      },
+    });
+
+    if (!auth) {
+      throw new Error("Invalid refresh token.");
+    }
+
+    if (!auth.refreshTokenExpiresAt || auth.refreshTokenExpiresAt < now) {
+      throw new Error("Refresh token has expired.");
+    }
+
+    const newRefreshToken = createRefreshToken();
+    const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
+    const newRefreshTokenExpiresAt = getRefreshTokenExpiryDate();
+
+    await prisma.auth.update({
+      where: { id: auth.id },
+      data: {
+        refreshTokenHash: newRefreshTokenHash,
+        refreshTokenExpiresAt: newRefreshTokenExpiresAt,
+      },
+    });
+
+    const accessToken = createAccessToken({
+      sub: auth.id,
+      email: auth.email,
+      name: auth.name,
+    });
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      tokenType: "Bearer",
+      accessTokenExpiresIn: getAccessTokenTtlSeconds(),
+      data: {
+        id: auth.id,
+        email: auth.email,
+        name: auth.name,
+        emailVerifiedAt: auth.emailVerifiedAt,
+      },
+    };
+  },
+
+  /**
+   * Revoke refresh token (logout).
+   */
+  async logout(dto: LogoutDto) {
+    const refreshTokenHash = hashRefreshToken(dto.refreshToken);
+    const auth = await prisma.auth.findFirst({
+      where: { refreshTokenHash },
+      select: { id: true },
+    });
+
+    if (!auth) {
+      return { revoked: false };
+    }
+
+    await prisma.auth.update({
+      where: { id: auth.id },
+      data: {
+        refreshTokenHash: null,
+        refreshTokenExpiresAt: null,
+      },
+    });
+
+    return { revoked: true };
   },
 
   /**

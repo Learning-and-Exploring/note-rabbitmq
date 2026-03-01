@@ -9,6 +9,12 @@ router.post("/", authController.createAuth);
 // POST /auths/login — login with email + password
 router.post("/login", authController.login);
 
+// POST /auths/refresh — refresh access token
+router.post("/refresh", authController.refreshToken);
+
+// POST /auths/logout — revoke refresh token
+router.post("/logout", authController.logout);
+
 // GET /auths   — list all auths
 router.get("/", authController.getAllAuths);
 
