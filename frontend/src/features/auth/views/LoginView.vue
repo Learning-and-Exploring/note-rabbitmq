@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from 'vue'
-import AuthScreen from '@/components/auth/AuthScreen.vue'
-import { useAuth } from '@/composables/useAuth'
+import AuthScreen from '@/features/auth/components/AuthScreen.vue'
+import { useAuth } from '@/features/auth/composables/useAuth'
 
 const { restoreSession } = useAuth()
 

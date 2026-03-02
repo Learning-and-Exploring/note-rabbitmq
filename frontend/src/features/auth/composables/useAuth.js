@@ -37,6 +37,11 @@ function clearSession() {
   isAuthenticated.value = false
 }
 
+function expireSession(message = 'Session expired. Please login again.') {
+  clearSession()
+  authStatus.value = message
+}
+
 function restoreSession() {
   if (initialized.value) return
   initialized.value = true
@@ -189,6 +194,10 @@ async function logout() {
   authStatus.value = 'Logged out'
 }
 
+function getAccessToken() {
+  return accessToken.value
+}
+
 export function useAuth() {
   return {
     isAuthenticated,
@@ -208,5 +217,7 @@ export function useAuth() {
     resendOtp,
     login,
     logout,
+    getAccessToken,
+    expireSession,
   }
 }

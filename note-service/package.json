@@ -4,9 +4,9 @@
   "description": "Note service - manages notes, syncs auth data via RabbitMQ",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "node --watch -r ts-node/register src/server.ts",
+    "dev": "node --env-file=.env --watch -r ts-node/register src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node --env-file=.env dist/server.js",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",

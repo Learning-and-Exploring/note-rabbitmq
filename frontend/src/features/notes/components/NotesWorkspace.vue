@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, watch } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
-import { useNotes } from '@/composables/useNotes'
+import BaseButton from '@/shared/components/base/BaseButton.vue'
+import { useNotes } from '@/features/notes/composables/useNotes'
 
 const props = defineProps({
   authId: {
@@ -92,7 +92,7 @@ onMounted(() => {
         placeholder="Untitled" />
       <textarea v-model="content"
         class="min-h-[50vh] w-full resize-y border-0 text-[17px] leading-8 text-neutral-800 outline-none"
-        placeholder="Type '/' for commands..." />
+        placeholder="Type Here" />
 
       <div class="mt-4 flex flex-wrap items-center gap-2.5">
         <BaseButton @click="saveNote(authId)">
