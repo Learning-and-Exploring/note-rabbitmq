@@ -1,20 +1,47 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import { useAuth } from '@/composables/useAuth'
+import LoginView from '@/views/LoginView.vue'
+import NotesView from '@/views/NotesView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: HomeView,
+      redirect: { name: 'notes' },
     },
     {
-      path: '/about',
-      name: 'about',
-      component: () => import('../views/AboutView.vue'),
+      path: '/login',
+      name: 'login',
+      component: LoginView,
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/notes',
+      name: 'notes',
+      component: NotesView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: { name: 'notes' },
     },
   ],
+})
+
+router.beforeEach((to) => {
+  const { restoreSession, isAuthenticated } = useAuth()
+  restoreSession()
+
+  if (to.meta.requiresAuth && !isAuthenticated.value) {
+    return { name: 'login' }
+  }
+
+  if (to.meta.guestOnly && isAuthenticated.value) {
+    return { name: 'notes' }
+  }
+
+  return true
 })
 
 export default router
