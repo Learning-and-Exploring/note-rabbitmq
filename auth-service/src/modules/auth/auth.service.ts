@@ -354,13 +354,13 @@ export const authService = {
       tokenType: "Bearer",
       accessTokenExpiresIn: getAccessTokenTtlSeconds(),
       data: {
-        // id: auth.id,
+        id: auth.id,
         email: auth.email,
         name: auth.name,
-        // role: auth.role,
+        role: auth.role,
         emailVerifiedAt: auth.emailVerifiedAt,
-        // createdAt: auth.createdAt,
-        // updatedAt: auth.updatedAt,
+        createdAt: auth.createdAt,
+        updatedAt: auth.updatedAt,
       },
     };
   },
