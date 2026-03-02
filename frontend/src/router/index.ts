@@ -55,11 +55,15 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.guestOnly && isAuthenticated.value) {
-    return { name: 'notes' }
+    return { name: isAdmin.value ? 'admin-users' : 'notes' }
   }
 
   if (to.meta.requiresAdmin && !isAdmin.value) {
     return { name: 'notes' }
+  }
+
+  if (to.name === 'notes' && isAdmin.value) {
+    return { name: 'admin-users' }
   }
 
   return true

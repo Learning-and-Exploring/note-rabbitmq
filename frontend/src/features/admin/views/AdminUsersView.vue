@@ -104,7 +104,6 @@ onMounted(async () => {
           <p class="text-sm text-neutral-500">Manage user accounts</p>
         </div>
         <div class="flex gap-2">
-          <BaseButton variant="secondary" @click="router.push('/notes')">Back to Notes</BaseButton>
           <BaseButton variant="secondary" :disabled="loading" @click="fetchUsers">Reload</BaseButton>
         </div>
       </div>

@@ -4,9 +4,12 @@ import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 
-const { isAuthenticated, currentUser, restoreSession, logout } = useAuth()
+const { isAuthenticated, isAdmin, restoreSession, logout } = useAuth()
 const router = useRouter()
-const homeRoute = computed(() => (isAuthenticated.value ? '/notes' : '/login'))
+const homeRoute = computed(() => {
+  if (!isAuthenticated.value) return '/login'
+  return isAdmin.value ? '/admin/users' : '/notes'
+})
 
 onMounted(() => {
   restoreSession()

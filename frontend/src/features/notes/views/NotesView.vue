@@ -15,6 +15,15 @@ onMounted(() => {
 })
 
 watch(
+  () => isAdmin.value,
+  (value) => {
+    if (value) {
+      router.replace('/admin/users')
+    }
+  },
+)
+
+watch(
   () => isAuthenticated.value,
   (value) => {
     if (!value) {
