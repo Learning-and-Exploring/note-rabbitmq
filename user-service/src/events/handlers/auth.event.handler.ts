@@ -5,6 +5,7 @@ interface AuthCreatedPayload {
   id: string;
   email: string;
   name?: string | null;
+  role?: "USER" | "ADMIN";
   createdAt: string;
 }
 
@@ -23,6 +24,7 @@ export async function handleAuthCreated(
     id: payload.id,
     email: payload.email,
     name: payload.name ?? undefined,
+    role: payload.role ?? "USER",
   });
 }
 

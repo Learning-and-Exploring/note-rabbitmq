@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
+import BaseModalDialog from '@/shared/components/base/BaseModalDialog.vue'
 import { useNotes } from '@/features/notes/composables/useNotes'
 
 const props = defineProps({
@@ -419,43 +420,33 @@ async function copyShareLink() {
     </section>
   </main>
 
-  <div
-    v-if="deleteCandidate"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    @click.self="closeDeleteModal"
+  <BaseModalDialog
+    :open="Boolean(deleteCandidate)"
+    title="Delete Note?"
+    description="This action cannot be undone."
+    @close="closeDeleteModal"
   >
-    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-      <h3 class="text-base font-semibold text-neutral-900">Delete Note?</h3>
-      <p class="mt-2 text-sm text-neutral-600">
-        This action cannot be undone.
-      </p>
-      <p class="mt-1 truncate text-sm text-neutral-700">
-        "{{ deleteCandidate?.title || 'Untitled Note' }}"
-      </p>
-      <div class="mt-5 flex justify-end gap-2">
-        <BaseButton variant="secondary" @click="closeDeleteModal">Cancel</BaseButton>
-        <BaseButton class="bg-red-600 hover:bg-red-700" @click="confirmDelete">Delete</BaseButton>
-      </div>
-    </div>
-  </div>
+    <p class="truncate text-sm text-neutral-700">
+      "{{ deleteCandidate?.title || 'Untitled Note' }}"
+    </p>
+    <template #actions>
+      <BaseButton variant="secondary" @click="closeDeleteModal">Cancel</BaseButton>
+      <BaseButton class="bg-red-600 hover:bg-red-700" @click="confirmDelete">Delete</BaseButton>
+    </template>
+  </BaseModalDialog>
 
-  <div
-    v-if="unsavedModalOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    @click.self="closeUnsavedModal"
+  <BaseModalDialog
+    :open="unsavedModalOpen"
+    title="Unsaved changes"
+    description="You have unsaved changes. Do you want to save before continuing?"
+    @close="closeUnsavedModal"
   >
-    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-      <h3 class="text-base font-semibold text-neutral-900">Unsaved changes</h3>
-      <p class="mt-2 text-sm text-neutral-600">
-        You have unsaved changes. Do you want to save before continuing?
-      </p>
-      <div class="mt-5 flex flex-wrap justify-end gap-2">
-        <BaseButton variant="secondary" @click="closeUnsavedModal">Cancel</BaseButton>
-        <BaseButton variant="secondary" @click="discardThenContinue">Discard</BaseButton>
-        <BaseButton @click="saveThenContinue">Save & Continue</BaseButton>
-      </div>
-    </div>
-  </div>
+    <template #actions>
+      <BaseButton variant="secondary" @click="closeUnsavedModal">Cancel</BaseButton>
+      <BaseButton variant="secondary" @click="discardThenContinue">Discard</BaseButton>
+      <BaseButton @click="saveThenContinue">Save & Continue</BaseButton>
+    </template>
+  </BaseModalDialog>
 
   <div
     v-if="shareModalOpen"

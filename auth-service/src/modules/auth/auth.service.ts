@@ -134,6 +134,7 @@ export const authService = {
       id: auth.id,
       email: auth.email,
       name: auth.name,
+      role: auth.role,
       createdAt: auth.createdAt.toISOString(),
       emailVerified: false,
     });

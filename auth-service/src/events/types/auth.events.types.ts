@@ -12,6 +12,7 @@ export interface AuthCreatedPayload {
   id: string;
   email: string;
   name?: string | null;
+  role: "USER" | "ADMIN";
   createdAt: string; // ISO 8601
   emailVerified: boolean;
 }
