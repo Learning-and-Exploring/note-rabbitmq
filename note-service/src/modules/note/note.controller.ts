@@ -72,4 +72,20 @@ export const noteController = {
       }
     }
   },
+
+  async deleteNoteById(req: Request, res: Response) {
+    try {
+      const {id} = req.params;
+      const note = await noteService.deleteNoteById(id as string);
+      res.status(204)
+    } catch (err: any) {
+      if (err.message === "Note not found.") {
+        res.status(404).json({ message: err.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: err.message });
+      }
+    }
+  }
 };
