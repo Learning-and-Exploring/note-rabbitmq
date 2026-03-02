@@ -56,6 +56,23 @@ export const noteService = {
     }
   },
 
+  /**
+   * Update a single note by ID
+   */
+  async updateNoteById(id: string, data: { title?: string; content?: string }) {
+    try {
+      return await prisma.note.update({
+        where: { id },
+        data,
+      });
+    } catch (err: unknown) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        throw new Error("Note not found.");
+      }
+      throw err;
+    }
+  },
+
 
   /**
    * Upsert a synced user (called by the RabbitMQ event handler).

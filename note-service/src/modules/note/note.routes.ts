@@ -15,6 +15,9 @@ router.get("/auth/:authId", noteController.getNotesByAuth);
 // GET /notes/:id           — get a single note (must come after /auth/:authId)
 router.get("/:id", noteController.getNoteById);
 
+// PATCH /notes/:id           — update a single note
+router.patch("/:id", noteController.updateNoteById);
+
 // Delete /notes/:id
 router.delete("/:id", noteController.deleteNoteById);
 

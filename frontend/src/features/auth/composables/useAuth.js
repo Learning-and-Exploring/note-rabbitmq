@@ -18,6 +18,17 @@ const loginPassword = ref('')
 const verifyEmail = ref('')
 const verifyOtp = ref('')
 
+function maskEmail(value) {
+  const raw = String(value || '').trim()
+  const at = raw.indexOf('@')
+  if (at <= 0) return raw
+
+  const name = raw.slice(0, at)
+  const domain = raw.slice(at + 1)
+  const visible = name.slice(0, Math.min(3, name.length))
+  return `${visible}***@${domain}`
+}
+
 function clearLegacyStorage() {
   try {
     localStorage.removeItem(LEGACY_STORAGE_KEY)
@@ -64,7 +75,7 @@ async function restoreSession() {
       currentUser.value = auth.data || null
       isAuthenticated.value = Boolean(accessToken.value && currentUser.value?.id)
       if (isAuthenticated.value) {
-        authStatus.value = `Logged in as ${currentUser.value.email}`
+        authStatus.value = `Logged in as ${maskEmail(currentUser.value.email)}`
       }
 
       return isAuthenticated.value
@@ -185,7 +196,7 @@ async function login() {
     currentUser.value = auth.data
     isAuthenticated.value = true
     initialized.value = true
-    authStatus.value = `Logged in as ${auth.data?.email || 'user'}`
+    authStatus.value = `Logged in as ${maskEmail(auth.data?.email || 'user')}`
     return true
   } catch (err) {
     console.error(err)

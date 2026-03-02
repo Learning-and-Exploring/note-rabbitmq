@@ -88,4 +88,32 @@ export const noteController = {
       }
     }
   },
+
+  async updateNoteById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { title, content } = req.body;
+      const hasTitle = typeof title !== "undefined";
+      const hasContent = typeof content !== "undefined";
+
+      if (!hasTitle && !hasContent) {
+        res.status(400).json({ message: "title or content is required." });
+        return;
+      }
+
+      const note = await noteService.updateNoteById(id as string, {
+        title,
+        content,
+      });
+      res.status(200).json({ message: "Note updated.", data: note });
+    } catch (err: any) {
+      if (err.message === "Note not found.") {
+        res.status(404).json({ message: err.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: err.message });
+      }
+    }
+  },
 };

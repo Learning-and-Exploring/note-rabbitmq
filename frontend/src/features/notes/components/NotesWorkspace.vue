@@ -35,6 +35,16 @@ const {
 } = useNotes()
 const deleteCandidate = ref(null)
 const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
+const saveButtonLabel = computed(() => (selectedNoteId.value ? 'Update Note' : 'Save Note'))
+const maskedEmail = computed(() => {
+  const raw = String(props.email || '').trim()
+  const at = raw.indexOf('@')
+  if (at <= 0) return raw || 'No email provided'
+  const name = raw.slice(0, at)
+  const domain = raw.slice(at + 1)
+  const visible = name.slice(0, Math.min(3, name.length))
+  return `${visible}***@${domain}`
+})
 
 watch(
   () => props.authId,
@@ -88,7 +98,7 @@ async function confirmDelete() {
         </div>
         <div class="rounded-lg bg-white p-3">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Email</p>
-          <p class="mt-1 truncate text-sm text-neutral-700">{{ email || 'No email provided' }}</p>
+          <p class="mt-1 truncate text-sm text-neutral-700">{{ maskedEmail }}</p>
         </div>
       </div>
 
@@ -139,7 +149,7 @@ async function confirmDelete() {
       </div>
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-6 py-4">
         <span class="text-xs text-neutral-500">{{ status }}</span>
-        <BaseButton size="md" @click="saveNote(authId)">Save Note</BaseButton>
+        <BaseButton size="md" @click="saveNote(authId)">{{ saveButtonLabel }}</BaseButton>
       </div>
     </section>
   </main>

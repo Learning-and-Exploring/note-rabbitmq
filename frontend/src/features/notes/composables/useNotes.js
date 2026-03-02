@@ -100,14 +100,26 @@ export function useNotes() {
 
     status.value = 'Saving...'
     try {
-      const res = await fetch('/api/notes', {
-        method: 'POST',
+      const isUpdate = Boolean(selectedNoteId.value)
+      const endpoint = isUpdate
+        ? `/api/notes/${encodeURIComponent(selectedNoteId.value)}`
+        : '/api/notes'
+
+      const body = isUpdate
+        ? {
+            title: title.value.trim() || 'Untitled Note',
+            content: content.value,
+          }
+        : {
+            authId: authId.trim(),
+            title: title.value.trim() || 'Untitled Note',
+            content: content.value,
+          }
+
+      const res = await fetch(endpoint, {
+        method: isUpdate ? 'PUT' : 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          authId: authId.trim(),
-          title: title.value.trim() || 'Untitled Note',
-          content: content.value,
-        }),
+        body: JSON.stringify(body),
       })
       const payload = await res.json()
       if (res.status === 401) {
@@ -119,7 +131,10 @@ export function useNotes() {
         return
       }
 
-      status.value = 'Saved'
+      status.value = isUpdate ? 'Updated' : 'Saved'
+      if (isUpdate && payload?.data?.id) {
+        selectedNoteId.value = payload.data.id
+      }
       await loadNotes(authId)
     } catch (err) {
       console.error(err)
