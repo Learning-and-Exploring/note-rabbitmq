@@ -38,7 +38,10 @@ services:
     command: npm run dev
     environment:
       NODE_ENV: development
+      NOTE_SERVICE_URL: http://note-service:3003
       ACCESS_TOKEN_SECRET: super_secret_access_key_change_me
+    depends_on:
+      - note-service
     volumes:
       - ./api-gateway:/app
       - /app/node_modules

@@ -42,6 +42,16 @@ export const noteService = {
   },
 
   /**
+   * Delete a single note by ID
+   */
+  async deleteNoteById(id: string) {
+    const note = await prisma.note.delete({ where: { id } });
+    if (!note) throw new Error("Note not found.");
+    return note;
+  },
+
+
+  /**
    * Upsert a synced user (called by the RabbitMQ event handler).
    */
   async upsertSyncedUser(data: {
