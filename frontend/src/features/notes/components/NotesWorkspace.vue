@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 import { useNotes } from '@/features/notes/composables/useNotes'
 
@@ -35,6 +35,7 @@ const {
 } = useNotes()
 const deleteCandidate = ref(null)
 const editorRef = ref(null)
+const activeToolbar = ref({})
 const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
 const saveButtonLabel = computed(() => (selectedNoteId.value ? 'Update Note' : 'Save Note'))
 const maskedEmail = computed(() => {
@@ -94,6 +95,42 @@ function runCommand(actionKey) {
     document.execCommand(actionKey, false)
   }
   syncModelFromEditor()
+  updateToolbarState()
+}
+
+function normalizeFormatBlock(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[<>]/g, '')
+}
+
+function isSelectionInsideEditor() {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0 || !editorRef.value) return false
+  const anchorNode = selection.anchorNode
+  return Boolean(anchorNode && editorRef.value.contains(anchorNode))
+}
+
+function updateToolbarState() {
+  if (!editorRef.value || !isSelectionInsideEditor()) {
+    activeToolbar.value = {}
+    return
+  }
+
+  const block = normalizeFormatBlock(document.queryCommandValue('formatBlock'))
+  activeToolbar.value = {
+    bold: document.queryCommandState('bold'),
+    italic: document.queryCommandState('italic'),
+    underline: document.queryCommandState('underline'),
+    insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+    insertOrderedList: document.queryCommandState('insertOrderedList'),
+    'formatBlock:h2': block === 'h2',
+    'formatBlock:blockquote': block === 'blockquote',
+  }
+}
+
+function isActionActive(actionKey) {
+  return Boolean(activeToolbar.value[actionKey])
 }
 
 watch(
@@ -110,6 +147,11 @@ onMounted(() => {
     loadNotes(props.authId)
   }
   syncEditorFromModel()
+  document.addEventListener('selectionchange', updateToolbarState)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('selectionchange', updateToolbarState)
 })
 
 watch(
@@ -208,7 +250,8 @@ async function confirmDelete() {
                 v-for="action in toolbarActions"
                 :key="action.key"
                 type="button"
-                class="rounded-md border border-neutral-200 px-2 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                class="rounded-md border px-2 py-1 text-xs font-semibold transition-colors"
+                :class="isActionActive(action.key) ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'"
                 :title="action.title"
                 @click="runCommand(action.key)"
               >
@@ -222,7 +265,10 @@ async function confirmDelete() {
             class="editor-input min-h-0 min-w-0 h-full overflow-y-auto p-0 pr-1 text-base leading-8 text-neutral-800 outline-none focus:border-neutral-200"
             contenteditable="true"
             data-placeholder="Write your ideas here..."
-            @input="syncModelFromEditor"
+            @input="syncModelFromEditor(); updateToolbarState()"
+            @keyup="updateToolbarState"
+            @mouseup="updateToolbarState"
+            @focus="updateToolbarState"
           />
         </div>
       </div>
