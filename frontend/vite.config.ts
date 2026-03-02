@@ -20,6 +20,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/auth-api': {
+        target: process.env.VITE_GATEWAY_BASE_URL || 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/auth-api/, ''),
+      },
     },
   },
   resolve: {
