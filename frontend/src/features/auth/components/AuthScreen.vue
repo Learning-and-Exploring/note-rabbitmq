@@ -137,10 +137,10 @@ async function handleResendOtp() {
         <BaseButton size="md" @click="handleLogin">Login</BaseButton>
       </div>
 
-      <p v-if="uiError" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+      <p v-if="uiError" class="text-center mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
         {{ uiError }}
       </p>
-      <p class="mt-3 text-xs text-neutral-500">{{ authStatus || 'Use your auth-service account.' }}</p>
+      <p class="text-center mt-3 text-xs text-neutral-500">{{ authStatus || 'Use your auth-service account.' }}</p>
     </section>
   </main>
 </template>
