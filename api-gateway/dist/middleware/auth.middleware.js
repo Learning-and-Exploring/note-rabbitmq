@@ -18,6 +18,8 @@ function isPublicAuthRoute(req) {
         return true;
     if (req.method === "POST" && path === "/auths/verify-email")
         return true;
+    if (req.method === "POST" && path === "/auths/resend-otp")
+        return true;
     if (req.method === "GET" && path === "/auths/health")
         return true;
     return false;

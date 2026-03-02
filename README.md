@@ -62,6 +62,8 @@ erDiagram
     datetime email_verified_at
     string email_verification_token_hash
     datetime email_verification_expires_at
+    int email_verification_otp_attempts
+    datetime email_verification_otp_sent_at
     datetime created_at
     datetime updated_at
   }
@@ -126,9 +128,13 @@ Gateway routes:
 
 - `GET /health`
 - `POST /auths`
+- `POST /auths/login`
+- `POST /auths/refresh`
+- `POST /auths/logout`
 - `GET /auths`
 - `GET /auths/:id`
-- `POST /auths/verify-email`
+- `POST /auths/verify-email` (body: `{ email, otp }`)
+- `POST /auths/resend-otp` (body: `{ email }`)
 - `GET /users`
 - `GET /users/:id`
 
@@ -158,6 +164,17 @@ From project root:
 docker compose up --build
 ```
 
+Auth email OTP (Gmail SMTP) envs for `auth-service`:
+
+- `SMTP_HOST=smtp.gmail.com`
+- `SMTP_PORT=465`
+- `SMTP_USER=<your_gmail>@gmail.com`
+- `SMTP_PASS=<gmail_app_password>`
+- `SMTP_FROM=<your_gmail>@gmail.com`
+- `EMAIL_OTP_TTL_MINUTES=5`
+- `EMAIL_OTP_RESEND_COOLDOWN_SECONDS=60`
+- `EMAIL_OTP_MAX_ATTEMPTS=5`
+
 RabbitMQ UI:
 
 - `http://localhost:15672`
@@ -180,4 +197,3 @@ npm run db:studio
 2. `auth-service` stores in `auth_service_db.auths` and publishes `auth.created`.
 3. `user-service` consumes `auth.created`, upserts `user_service_db.users`, and publishes `user.created`.
 4. `note-service` consumes `user.created`, upserts `note_service_db.synced_auths`, and creates a welcome row in `note_service_db.notes`.
-

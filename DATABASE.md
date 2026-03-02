@@ -34,6 +34,8 @@ erDiagram
     datetime email_verified_at
     string email_verification_token_hash
     datetime email_verification_expires_at
+    int email_verification_otp_attempts
+    datetime email_verification_otp_sent_at
     datetime created_at
     datetime updated_at
   }
@@ -94,4 +96,3 @@ erDiagram
 | Auth DB | `auth-db` | `5433` | `auth_service_db` |
 | Note DB | `note-db` | `5434` | `note_service_db` |
 | User DB | `user-db` | `5435` | `user_service_db` |
-
