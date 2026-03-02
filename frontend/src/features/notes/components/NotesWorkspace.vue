@@ -306,7 +306,7 @@ async function copyShareLink() {
 
 <template>
   <main class="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-5 overflow-x-hidden p-5 lg:grid-cols-12">
-    <aside class="min-w-0 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:col-span-4">
+    <aside class="min-w-0 self-start rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:col-span-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-base font-semibold text-neutral-900">Workspace</h2>
@@ -333,15 +333,15 @@ async function copyShareLink() {
         <div
           v-for="note in notes"
           :key="note.id"
-          class="flex h-24 min-w-0 items-start gap-2 rounded-xl border p-2 transition-colors"
+          class="flex min-h-24 min-w-0 items-start gap-2 rounded-xl border p-2 transition-colors"
           :class="note.id === selectedNoteId ? 'border-blue-400 bg-blue-50/50 shadow-sm' : 'border-neutral-200 bg-white hover:bg-neutral-50'"
         >
           <button
-            class="flex h-full min-w-0 flex-1 flex-col justify-start overflow-hidden rounded-md px-1 py-0.5 text-left"
+            class="flex min-w-0 flex-1 flex-col justify-start overflow-hidden rounded-md px-1 py-0.5 text-left"
             @click="handleSelectNote(note.id)"
           >
             <p class="truncate text-sm font-semibold text-neutral-900">{{ note.title || 'Untitled Note' }}</p>
-            <p class="mt-1 truncate text-xs text-neutral-500">{{ preview(note.content) }}</p>
+            <p class="note-preview mt-1 text-xs text-neutral-500">{{ preview(note.content) }}</p>
           </button>
           <BaseButton
             variant="ghost"
@@ -516,5 +516,14 @@ async function copyShareLink() {
 .editor-input :deep(ul),
 .editor-input :deep(ol) {
   margin: 0.5rem 0 0.5rem 1.2rem;
+}
+
+.note-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.25rem;
+  min-height: 2.5rem;
 }
 </style>
