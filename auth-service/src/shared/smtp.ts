@@ -89,11 +89,13 @@ async function sendCommand(
   socket: tls.TLSSocket,
   command: string,
   expectedCode: number,
+  label?: string,
 ): Promise<void> {
   socket.write(`${command}\r\n`);
   const reply = await waitForReply(socket);
   if (reply.code !== expectedCode) {
-    throw new Error(`SMTP command failed: ${command}. Reply: ${reply.text}`);
+    const visibleCommand = label ?? command;
+    throw new Error(`SMTP command failed: ${visibleCommand}. Reply: ${reply.text}`);
   }
 }
 
@@ -119,21 +121,40 @@ function buildMessage(input: SendOtpEmailInput): string {
   ].join("\r\n");
 }
 
+function buildAuthErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (
+    message.includes("535") ||
+    message.includes("5.7.8") ||
+    message.toLowerCase().includes("badcredentials")
+  ) {
+    return (
+      `${message} ` +
+      "Gmail SMTP requires an App Password when 2-Step Verification is enabled. " +
+      "Set SMTP_USER to your full Gmail address and SMTP_PASS to a 16-character Gmail App Password."
+    );
+  }
+
+  return message;
+}
+
 export async function sendVerificationOtpEmail(input: SendOtpEmailInput): Promise<void> {
   const host = env.SMTP_HOST;
   const port = readNumber(env.SMTP_PORT, 465);
   const user = env.SMTP_USER;
   const pass = env.SMTP_PASS;
   const from = env.SMTP_FROM || user;
+  const hasPlaceholderValue =
+    user.includes("your_gmail") ||
+    pass.includes("your_gmail_app_password") ||
+    from.includes("your_gmail");
 
-  if (!user || !pass || !from) {
-    if (env.NODE_ENV === "production") {
-      throw new Error("SMTP credentials are not configured.");
-    }
-    logger.warn(
-      `[auth-service] SMTP is not configured. OTP for ${input.to}: ${input.otp}`,
+  if (!user || !pass || !from || hasPlaceholderValue) {
+    logger.error(`[auth-service] SMTP is not configured. Email OTP cannot be sent to ${input.to}.`);
+    throw new Error(
+      "SMTP credentials are not configured. Set SMTP_USER, SMTP_PASS (Gmail App Password), and SMTP_FROM.",
     );
-    return;
   }
 
   const socket = await createSocket(host, port);
@@ -145,8 +166,8 @@ export async function sendVerificationOtpEmail(input: SendOtpEmailInput): Promis
 
     await sendCommand(socket, `EHLO ${host}`, 250);
     await sendCommand(socket, `AUTH LOGIN`, 334);
-    await sendCommand(socket, base64(user), 334);
-    await sendCommand(socket, base64(pass), 235);
+    await sendCommand(socket, base64(user), 334, "<SMTP_USERNAME_BASE64>");
+    await sendCommand(socket, base64(pass), 235, "<SMTP_PASSWORD_BASE64>");
     await sendCommand(socket, `MAIL FROM:<${sanitize(from)}>`, 250);
     await sendCommand(socket, `RCPT TO:<${sanitize(input.to)}>`, 250);
     await sendCommand(socket, "DATA", 354);
@@ -159,6 +180,12 @@ export async function sendVerificationOtpEmail(input: SendOtpEmailInput): Promis
     }
 
     await sendCommand(socket, "QUIT", 221);
+  } catch (error) {
+    const wrapped = new Error(buildAuthErrorMessage(error));
+    if (error instanceof Error) {
+      wrapped.stack = `${wrapped.stack ?? wrapped.message}\nCaused by: ${error.stack ?? error.message}`;
+    }
+    throw wrapped;
   } finally {
     socket.end();
   }
