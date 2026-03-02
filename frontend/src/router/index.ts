@@ -29,9 +29,9 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const { restoreSession, isAuthenticated } = useAuth()
-  restoreSession()
+  await restoreSession()
 
   if (to.meta.requiresAuth && !isAuthenticated.value) {
     return { name: 'login' }

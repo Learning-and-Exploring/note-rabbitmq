@@ -9,6 +9,12 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 
+try {
+  localStorage.removeItem('notionui.auth')
+} catch {
+  // Ignore storage access errors.
+}
+
 const app = createApp(App)
 
 app.use(createPinia())

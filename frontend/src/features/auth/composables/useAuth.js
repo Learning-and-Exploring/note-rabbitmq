@@ -1,13 +1,13 @@
 import { ref } from 'vue'
 
-const STORAGE_KEY = 'notionui.auth'
+const LEGACY_STORAGE_KEY = 'notionui.auth'
 
 const initialized = ref(false)
 const isAuthenticated = ref(false)
 const currentUser = ref(null)
 const accessToken = ref('')
-const refreshToken = ref('')
 const authStatus = ref('')
+let restorePromise = null
 
 const authMode = ref('login')
 const registerName = ref('')
@@ -18,21 +18,17 @@ const loginPassword = ref('')
 const verifyEmail = ref('')
 const verifyOtp = ref('')
 
-function persistSession() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      accessToken: accessToken.value,
-      refreshToken: refreshToken.value,
-      user: currentUser.value,
-    }),
-  )
+function clearLegacyStorage() {
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
+  } catch {
+    // Ignore storage errors in restricted environments.
+  }
 }
 
 function clearSession() {
-  localStorage.removeItem(STORAGE_KEY)
+  clearLegacyStorage()
   accessToken.value = ''
-  refreshToken.value = ''
   currentUser.value = null
   isAuthenticated.value = false
 }
@@ -42,25 +38,46 @@ function expireSession(message = 'Session expired. Please login again.') {
   authStatus.value = message
 }
 
-function restoreSession() {
-  if (initialized.value) return
-  initialized.value = true
+async function restoreSession() {
+  clearLegacyStorage()
 
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return
+  if (initialized.value) return isAuthenticated.value
+  if (restorePromise) return restorePromise
 
-  try {
-    const parsed = JSON.parse(raw)
-    accessToken.value = parsed.accessToken || ''
-    refreshToken.value = parsed.refreshToken || ''
-    currentUser.value = parsed.user || null
-    isAuthenticated.value = Boolean(parsed.accessToken && parsed.user?.id)
-    if (isAuthenticated.value) {
-      authStatus.value = `Logged in as ${parsed.user.email}`
+  restorePromise = (async () => {
+    try {
+      const res = await fetch('/auth-api/auths/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      })
+
+      if (!res.ok) {
+        clearSession()
+        return false
+      }
+
+      const payload = await res.json()
+      const auth = payload.data
+      accessToken.value = auth.accessToken || ''
+      currentUser.value = auth.data || null
+      isAuthenticated.value = Boolean(accessToken.value && currentUser.value?.id)
+      if (isAuthenticated.value) {
+        authStatus.value = `Logged in as ${currentUser.value.email}`
+      }
+
+      return isAuthenticated.value
+    } catch {
+      clearSession()
+      return false
+    } finally {
+      initialized.value = true
+      restorePromise = null
     }
-  } catch {
-    clearSession()
-  }
+  })()
+
+  return restorePromise
 }
 
 async function register() {
@@ -145,11 +162,13 @@ async function resendOtp() {
 }
 
 async function login() {
+  clearLegacyStorage()
   authStatus.value = 'Logging in...'
   try {
     const res = await fetch('/auth-api/auths/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({
         email: loginEmail.value,
         password: loginPassword.value,
@@ -163,10 +182,9 @@ async function login() {
 
     const auth = payload.data
     accessToken.value = auth.accessToken
-    refreshToken.value = auth.refreshToken
     currentUser.value = auth.data
     isAuthenticated.value = true
-    persistSession()
+    initialized.value = true
     authStatus.value = `Logged in as ${auth.data?.email || 'user'}`
     return true
   } catch (err) {
@@ -179,13 +197,12 @@ async function login() {
 async function logout() {
   authStatus.value = 'Logging out...'
   try {
-    if (refreshToken.value) {
-      await fetch('/auth-api/auths/logout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refreshToken.value }),
-      })
-    }
+    await fetch('/auth-api/auths/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    })
   } catch (err) {
     console.error(err)
   }
