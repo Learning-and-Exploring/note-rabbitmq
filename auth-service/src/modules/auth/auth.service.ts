@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "../../shared/database";
 import {
+  AuthRole,
   CreateAuthDto,
   LoginAuthDto,
   LogoutDto,
@@ -61,6 +62,20 @@ function getOtpExpiryDate(): Date {
   return new Date(Date.now() + getEmailOtpTtlMinutes() * 60 * 1000);
 }
 
+function parseAdminEmails(raw: string): Set<string> {
+  return new Set(
+    raw
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function resolveRoleOnRegistration(email: string): AuthRole {
+  const adminEmails = parseAdminEmails(env.ADMIN_EMAILS);
+  return adminEmails.has(email.trim().toLowerCase()) ? "ADMIN" : "USER";
+}
+
 export const authService = {
   /**
    * Create a new auth, persist to DB, then publish a RabbitMQ event.
@@ -85,6 +100,7 @@ export const authService = {
         email: dto.email,
         passwordHash,
         name: dto.name,
+        role: dto.role ?? resolveRoleOnRegistration(dto.email),
         emailVerificationOtpHash: otpHash,
         emailVerificationOtpExpiresAt: otpExpiresAt,
         emailVerificationOtpAttempts: 0,
@@ -94,6 +110,7 @@ export const authService = {
         id: true,
         email: true,
         name: true,
+        role: true,
         emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -117,6 +134,7 @@ export const authService = {
       id: auth.id,
       email: auth.email,
       name: auth.name,
+      role: auth.role,
       createdAt: auth.createdAt.toISOString(),
       emailVerified: false,
     });
@@ -126,6 +144,24 @@ export const authService = {
       verificationOtpSent: true,
       verificationOtpExpiresAt: otpExpiresAt,
     };
+  },
+
+  /**
+   * update name by ID
+   */
+  async updateNameById(id: string, name: string) {
+    const auth = await prisma.auth.update({
+      where: { id },
+      data: {
+        name,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true
+      }
+    })
+    return auth;
   },
 
   /**
@@ -273,6 +309,7 @@ export const authService = {
         id: true,
         email: true,
         name: true,
+        role: true,
         passwordHash: true,
         emailVerifiedAt: true,
         createdAt: true,
@@ -309,6 +346,7 @@ export const authService = {
       sub: auth.id,
       email: auth.email,
       name: auth.name,
+      role: auth.role,
     });
 
     return {
@@ -320,6 +358,7 @@ export const authService = {
         id: auth.id,
         email: auth.email,
         name: auth.name,
+        role: auth.role,
         emailVerifiedAt: auth.emailVerifiedAt,
         createdAt: auth.createdAt,
         updatedAt: auth.updatedAt,
@@ -340,6 +379,7 @@ export const authService = {
         id: true,
         email: true,
         name: true,
+        role: true,
         emailVerifiedAt: true,
         refreshTokenExpiresAt: true,
       },
@@ -369,6 +409,7 @@ export const authService = {
       sub: auth.id,
       email: auth.email,
       name: auth.name,
+      role: auth.role,
     });
 
     return {
@@ -380,6 +421,7 @@ export const authService = {
         id: auth.id,
         email: auth.email,
         name: auth.name,
+        role: auth.role,
         emailVerifiedAt: auth.emailVerifiedAt,
       },
     };
@@ -419,6 +461,7 @@ export const authService = {
         id: true,
         email: true,
         name: true,
+        role: true,
         emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -437,6 +480,7 @@ export const authService = {
         id: true,
         email: true,
         name: true,
+        role: true,
         emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,

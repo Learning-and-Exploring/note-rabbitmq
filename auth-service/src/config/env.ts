@@ -12,6 +12,7 @@ export const env = {
   EMAIL_OTP_RESEND_COOLDOWN_SECONDS:
     process.env.EMAIL_OTP_RESEND_COOLDOWN_SECONDS ?? "60",
   EMAIL_OTP_MAX_ATTEMPTS: process.env.EMAIL_OTP_MAX_ATTEMPTS ?? "5",
+  ADMIN_EMAILS: process.env.ADMIN_EMAILS ?? "",
   SMTP_HOST: process.env.SMTP_HOST ?? "smtp.gmail.com",
   SMTP_PORT: process.env.SMTP_PORT ?? "465",
   SMTP_USER: process.env.SMTP_USER ?? "",

@@ -1,6 +1,9 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
+import BaseModalDialog from '@/shared/components/base/BaseModalDialog.vue'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { useNotes } from '@/features/notes/composables/useNotes'
 
 const props = defineProps({
@@ -15,6 +18,10 @@ const props = defineProps({
   email: {
     type: String,
     default: '',
+  },
+  isAdmin: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -38,15 +45,31 @@ const {
   unshareNote,
   clearAll,
 } = useNotes()
+const { updateName } = useAuth()
 const deleteCandidate = ref(null)
 const unsavedModalOpen = ref(false)
 const pendingAction = ref(null)
 const shareModalOpen = ref(false)
 const shareModalCopied = ref(false)
+const nameModalOpen = ref(false)
+const nameDraft = ref('')
+const nameUpdating = ref(false)
+const nameStatus = ref('')
+const nameInputRef = ref(null)
 const editorRef = ref(null)
 const activeToolbar = ref({})
+const syncingFromEditor = ref(false)
 const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
 const saveButtonLabel = computed(() => (selectedNoteId.value ? 'Update Note' : 'Save Note'))
+const trimmedNameDraft = computed(() => String(nameDraft.value || '').trim())
+const isNameChanged = computed(() => trimmedNameDraft.value !== String(props.userName || '').trim())
+const canSaveName = computed(() => Boolean(trimmedNameDraft.value) && isNameChanged.value && !nameUpdating.value)
+const nameStatusClass = computed(() => {
+  if (!nameStatus.value) return 'text-neutral-500'
+  if (nameStatus.value.toLowerCase().includes('updated')) return 'text-emerald-600'
+  if (nameStatus.value.toLowerCase().includes('failed') || nameStatus.value.toLowerCase().includes('required')) return 'text-red-600'
+  return 'text-neutral-500'
+})
 const selectedNote = computed(() => notes.value.find((note) => note.id === selectedNoteId.value) || null)
 const shareLink = computed(() => {
   if (!selectedNote.value?.isPublic || !selectedNote.value?.shareToken) return ''
@@ -78,12 +101,32 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
 }
 
+function decodeHtmlEntities(value, maxIterations = 5) {
+  let decoded = String(value ?? '')
+  const textarea = document.createElement('textarea')
+
+  for (let i = 0; i < maxIterations; i += 1) {
+    textarea.innerHTML = decoded
+    const next = textarea.value
+    if (next === decoded) break
+    decoded = next
+  }
+
+  return decoded
+}
+
+function isRichHtml(value) {
+  return /<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|h1|h2|h3|blockquote|span|a)(?:\s|>|\/)/i.test(String(value || ''))
+}
+
 function toEditorHtml(raw) {
   if (!raw) return ''
   const text = String(raw)
-  const looksLikeHtml = /<[^>]+>/.test(text)
-  if (looksLikeHtml) return text
-  return escapeHtml(text).replace(/\n/g, '<br>')
+  if (isRichHtml(text)) return text
+
+  // Normalize recursively encoded entities so re-renders do not compound `&amp;...`.
+  const normalized = decodeHtmlEntities(text)
+  return escapeHtml(normalized).replace(/\n/g, '<br>')
 }
 
 function syncEditorFromModel() {
@@ -96,7 +139,11 @@ function syncEditorFromModel() {
 
 function syncModelFromEditor() {
   if (!editorRef.value) return
+  syncingFromEditor.value = true
   content.value = editorRef.value.innerHTML
+  nextTick(() => {
+    syncingFromEditor.value = false
+  })
 }
 
 function runCommand(actionKey) {
@@ -171,6 +218,8 @@ onBeforeUnmount(() => {
 watch(
   () => content.value,
   () => {
+    if (syncingFromEditor.value) return
+    if (document.activeElement === editorRef.value) return
     nextTick(() => {
       syncEditorFromModel()
     })
@@ -275,17 +324,70 @@ async function copyShareLink() {
     status.value = 'Failed to copy share link'
   }
 }
+
+function openNameModal() {
+  nameDraft.value = String(props.userName || '').trim()
+  nameStatus.value = ''
+  nameModalOpen.value = true
+  nextTick(() => {
+    nameInputRef.value?.focus()
+    nameInputRef.value?.select?.()
+  })
+}
+
+function closeNameModal() {
+  if (nameUpdating.value) return
+  nameModalOpen.value = false
+  nameStatus.value = ''
+}
+
+async function saveName() {
+  if (nameUpdating.value) return
+
+  if (!trimmedNameDraft.value) {
+    nameStatus.value = 'Name is required'
+    return
+  }
+
+  if (!isNameChanged.value) {
+    nameStatus.value = 'Name is unchanged'
+    return
+  }
+
+  nameUpdating.value = true
+  nameStatus.value = 'Updating name...'
+
+  try {
+    const updated = await updateName(trimmedNameDraft.value)
+    if (!updated) {
+      nameStatus.value = 'Failed to update name'
+      return
+    }
+
+    nameStatus.value = 'Name updated'
+    nameModalOpen.value = false
+  } finally {
+    nameUpdating.value = false
+  }
+}
 </script>
 
 <template>
   <main class="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-5 overflow-x-hidden p-5 lg:grid-cols-12">
-    <aside class="min-w-0 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:col-span-4">
+    <aside class="min-w-0 self-start rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:col-span-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-base font-semibold text-neutral-900">Workspace</h2>
           <p class="text-xs text-neutral-500">{{ noteCountLabel }}</p>
         </div>
         <div class="flex gap-2">
+          <RouterLink
+            v-if="isAdmin"
+            to="/admin/users"
+            class="inline-flex items-center rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+          >
+            Admin Users
+          </RouterLink>
           <BaseButton variant="secondary" @click="loadNotes(authId)">Reload</BaseButton>
           <BaseButton variant="secondary" @click="handleNewDraft">New Draft</BaseButton>
         </div>
@@ -293,8 +395,17 @@ async function copyShareLink() {
 
       <div class="mb-4 grid gap-3 rounded-xl border border-neutral-100 bg-neutral-50 p-3 md:grid-cols-2">
         <div class="rounded-lg bg-white p-3">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Name</p>
-          <p class="mt-1 truncate text-sm font-medium text-neutral-800">{{ userName || 'Unnamed User' }}</p>
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Name</p>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-md px-2 py-1 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+              @click="openNameModal"
+            >
+              Edit
+            </button>
+          </div>
+          <p class="mt-1 truncate text-sm font-medium text-neutral-800">{{ userName || 'Unnamed' }}</p>
         </div>
         <div class="rounded-lg bg-white p-3">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Email</p>
@@ -306,15 +417,15 @@ async function copyShareLink() {
         <div
           v-for="note in notes"
           :key="note.id"
-          class="flex h-24 min-w-0 items-start gap-2 rounded-xl border p-2 transition-colors"
+          class="flex min-h-24 min-w-0 items-start gap-2 rounded-xl border p-2 transition-colors"
           :class="note.id === selectedNoteId ? 'border-blue-400 bg-blue-50/50 shadow-sm' : 'border-neutral-200 bg-white hover:bg-neutral-50'"
         >
           <button
-            class="flex h-full min-w-0 flex-1 flex-col justify-start overflow-hidden rounded-md px-1 py-0.5 text-left"
+            class="flex min-w-0 flex-1 flex-col justify-start overflow-hidden rounded-md px-1 py-0.5 text-left"
             @click="handleSelectNote(note.id)"
           >
             <p class="truncate text-sm font-semibold text-neutral-900">{{ note.title || 'Untitled Note' }}</p>
-            <p class="mt-1 truncate text-xs text-neutral-500">{{ preview(note.content) }}</p>
+            <p class="note-preview mt-1 text-xs text-neutral-500">{{ preview(note.content) }}</p>
           </button>
           <BaseButton
             variant="ghost"
@@ -380,43 +491,33 @@ async function copyShareLink() {
     </section>
   </main>
 
-  <div
-    v-if="deleteCandidate"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    @click.self="closeDeleteModal"
+  <BaseModalDialog
+    :open="Boolean(deleteCandidate)"
+    title="Delete Note?"
+    description="This action cannot be undone."
+    @close="closeDeleteModal"
   >
-    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-      <h3 class="text-base font-semibold text-neutral-900">Delete Note?</h3>
-      <p class="mt-2 text-sm text-neutral-600">
-        This action cannot be undone.
-      </p>
-      <p class="mt-1 truncate text-sm text-neutral-700">
-        "{{ deleteCandidate?.title || 'Untitled Note' }}"
-      </p>
-      <div class="mt-5 flex justify-end gap-2">
-        <BaseButton variant="secondary" @click="closeDeleteModal">Cancel</BaseButton>
-        <BaseButton class="bg-red-600 hover:bg-red-700" @click="confirmDelete">Delete</BaseButton>
-      </div>
-    </div>
-  </div>
+    <p class="truncate text-sm text-neutral-700">
+      "{{ deleteCandidate?.title || 'Untitled Note' }}"
+    </p>
+    <template #actions>
+      <BaseButton variant="secondary" @click="closeDeleteModal">Cancel</BaseButton>
+      <BaseButton class="bg-red-600 hover:bg-red-700" @click="confirmDelete">Delete</BaseButton>
+    </template>
+  </BaseModalDialog>
 
-  <div
-    v-if="unsavedModalOpen"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    @click.self="closeUnsavedModal"
+  <BaseModalDialog
+    :open="unsavedModalOpen"
+    title="Unsaved changes"
+    description="You have unsaved changes. Do you want to save before continuing?"
+    @close="closeUnsavedModal"
   >
-    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-      <h3 class="text-base font-semibold text-neutral-900">Unsaved changes</h3>
-      <p class="mt-2 text-sm text-neutral-600">
-        You have unsaved changes. Do you want to save before continuing?
-      </p>
-      <div class="mt-5 flex flex-wrap justify-end gap-2">
-        <BaseButton variant="secondary" @click="closeUnsavedModal">Cancel</BaseButton>
-        <BaseButton variant="secondary" @click="discardThenContinue">Discard</BaseButton>
-        <BaseButton @click="saveThenContinue">Save & Continue</BaseButton>
-      </div>
-    </div>
-  </div>
+    <template #actions>
+      <BaseButton variant="secondary" @click="closeUnsavedModal">Cancel</BaseButton>
+      <BaseButton variant="secondary" @click="discardThenContinue">Discard</BaseButton>
+      <BaseButton @click="saveThenContinue">Save & Continue</BaseButton>
+    </template>
+  </BaseModalDialog>
 
   <div
     v-if="shareModalOpen"
@@ -464,6 +565,37 @@ async function copyShareLink() {
       </div>
     </div>
   </div>
+
+  <BaseModalDialog
+    :open="nameModalOpen"
+    title="Change Name"
+    description="This updates how your name appears in your workspace."
+    @close="closeNameModal"
+  >
+    <label class="block text-sm text-neutral-700">
+      <span class="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">New name</span>
+      <input
+        ref="nameInputRef"
+        v-model="nameDraft"
+        type="text"
+        maxlength="100"
+        class="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-blue-400"
+        placeholder="Enter your name"
+        @keydown.enter.prevent="saveName"
+      />
+    </label>
+    <div class="mt-2 flex items-center justify-between gap-2">
+      <p class="text-xs" :class="nameStatusClass">{{ nameStatus || 'Use your real name so collaborators can recognize you.' }}</p>
+      <p class="text-[11px] text-neutral-400">{{ trimmedNameDraft.length }}/100</p>
+    </div>
+
+    <template #actions>
+      <BaseButton variant="secondary" :disabled="nameUpdating" @click="closeNameModal">Cancel</BaseButton>
+      <BaseButton :disabled="!canSaveName" @click="saveName">
+        {{ nameUpdating ? 'Saving...' : 'Save' }}
+      </BaseButton>
+    </template>
+  </BaseModalDialog>
 </template>
 
 <style scoped>
@@ -489,5 +621,14 @@ async function copyShareLink() {
 .editor-input :deep(ul),
 .editor-input :deep(ol) {
   margin: 0.5rem 0 0.5rem 1.2rem;
+}
+
+.note-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.25rem;
+  min-height: 2.5rem;
 }
 </style>

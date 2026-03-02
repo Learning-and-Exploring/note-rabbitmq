@@ -13,6 +13,20 @@ export function useNotes() {
   const savedContent = ref('')
   const { getAccessToken, expireSession } = useAuth()
 
+  function decodeHtmlEntities(value, maxIterations = 5) {
+    let decoded = String(value ?? '')
+    const parser = document.createElement('textarea')
+
+    for (let i = 0; i < maxIterations; i += 1) {
+      parser.innerHTML = decoded
+      const next = parser.value
+      if (next === decoded) break
+      decoded = next
+    }
+
+    return decoded
+  }
+
   function authHeaders(baseHeaders = {}) {
     const token = getAccessToken()
     if (!token) return baseHeaders
@@ -46,12 +60,10 @@ export function useNotes() {
 
   function preview(value) {
     if (!value) return 'No content'
-    const plain = String(value)
+    const plain = decodeHtmlEntities(String(value))
       .replace(/<[^>]*>/g, ' ')
       .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&lt;/gi, '<')
-      .replace(/&gt;/gi, '>')
+      .replace(/\u00a0/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
     const compact = plain || 'No content'
@@ -139,7 +151,7 @@ export function useNotes() {
           }
 
       const res = await fetch(endpoint, {
-        method: isUpdate ? 'PUT' : 'POST',
+        method: isUpdate ? 'PATCH' : 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(body),
       })

@@ -9,6 +9,7 @@ const uiError = ref('')
 const {
   authStatus,
   authMode,
+  isAdmin,
   registerName,
   registerEmail,
   registerPassword,
@@ -70,7 +71,7 @@ async function handleLogin() {
   if (uiError.value) return
   const ok = await login()
   if (ok) {
-    router.replace('/notes')
+    router.replace(isAdmin.value ? '/admin/users' : '/notes')
   }
 }
 

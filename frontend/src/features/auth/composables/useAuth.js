@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const LEGACY_STORAGE_KEY = 'notionui.auth'
 
@@ -6,6 +6,7 @@ const initialized = ref(false)
 const isAuthenticated = ref(false)
 const currentUser = ref(null)
 const accessToken = ref('')
+const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 const authStatus = ref('')
 let restorePromise = null
 
@@ -222,6 +223,54 @@ async function logout() {
   authStatus.value = 'Logged out'
 }
 
+async function updateName(name) {
+  const userId = currentUser.value?.id
+  const token = accessToken.value
+  const trimmedName = String(name || '').trim()
+
+  if (!userId || !token) {
+    authStatus.value = 'You are not authenticated'
+    return false
+  }
+
+  if (!trimmedName) {
+    authStatus.value = 'Name is required'
+    return false
+  }
+
+  authStatus.value = 'Updating name...'
+
+  try {
+    const res = await fetch(`/auth-api/auths/change-name/${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name: trimmedName }),
+    })
+
+    const payload = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      authStatus.value = payload.message || 'Failed to update name'
+      return false
+    }
+
+    currentUser.value = {
+      ...(currentUser.value || {}),
+      ...(payload.data || {}),
+      name: payload.data?.name || trimmedName,
+    }
+    authStatus.value = 'Name updated'
+    return true
+  } catch (err) {
+    console.error(err)
+    authStatus.value = 'Failed to update name'
+    return false
+  }
+}
+
 function getAccessToken() {
   return accessToken.value
 }
@@ -229,6 +278,7 @@ function getAccessToken() {
 export function useAuth() {
   return {
     isAuthenticated,
+    isAdmin,
     currentUser,
     authStatus,
     authMode,
@@ -245,6 +295,7 @@ export function useAuth() {
     resendOtp,
     login,
     logout,
+    updateName,
     getAccessToken,
     expireSession,
   }

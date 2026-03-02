@@ -77,6 +77,34 @@ export const authController = {
   },
 
   /**
+   * PATCH /auths/change-name/:id
+   */
+  async updateNameById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { name } = req.body;
+
+      if (!name) {
+        res.status(400).json({ message: "name is required." });
+        return;
+      }
+
+      const auth = await authService.updateNameById(id as string, name);
+      res.status(200).json({ message: "Name updated successfully.", data: auth });
+    }
+    catch (error: any) {
+      if (error.message === "A auth with that email already exists.") {
+        res.status(409).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: error.message });
+      }
+    }
+  },
+  
+
+  /**
    * POST /auths/login
    * Login with email and password.
    * Body: { email, password }

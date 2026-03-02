@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { env } from "../config/env";
 
 interface AccessTokenPayload {
   sub: string;
@@ -8,8 +9,6 @@ interface AccessTokenPayload {
   iat: number;
   exp: number;
 }
-
-const DEFAULT_ACCESS_TOKEN_SECRET = "dev_access_secret_change_me";
 
 function base64UrlDecode(input: string): string {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -28,7 +27,7 @@ function sign(input: string, secret: string): string {
 }
 
 function getAccessTokenSecret(): string {
-  return process.env.ACCESS_TOKEN_SECRET ?? DEFAULT_ACCESS_TOKEN_SECRET;
+  return env.ACCESS_TOKEN_SECRET;
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
@@ -48,6 +47,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
     base64UrlDecode(encodedPayload),
   ) as AccessTokenPayload;
   const now = Math.floor(Date.now() / 1000);
+
   if (!payload.exp || payload.exp <= now) {
     throw new Error("Token expired.");
   }

@@ -7,11 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AuthRole {
+  USER
+  ADMIN
+}
+
 model Auth {
   id                         String    @id @default(uuid())
   email                      String    @unique
   passwordHash               String    @map("password_hash")
   name                       String?
+  role                       AuthRole  @default(USER)
   emailVerifiedAt            DateTime? @map("email_verified_at")
   emailVerificationOtpHash   String?   @map("email_verification_token_hash")
   emailVerificationOtpExpiresAt DateTime? @map("email_verification_expires_at")

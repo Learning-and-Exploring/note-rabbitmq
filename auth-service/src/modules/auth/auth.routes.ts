@@ -27,4 +27,7 @@ router.post("/resend-otp", authController.resendVerificationOtp);
 // GET /auths/:id — get a single auth by ID
 router.get("/:id", authController.getAuthById);
 
+// UDPATE NAME /auths/change-name 
+router.patch("/change-name/:id", authController.updateNameById);
+
 export default router;

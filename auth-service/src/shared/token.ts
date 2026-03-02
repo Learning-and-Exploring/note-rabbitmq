@@ -4,6 +4,7 @@ interface AccessTokenPayload {
   sub: string;
   email: string;
   name?: string | null;
+  role: "USER" | "ADMIN";
   iat: number;
   exp: number;
 }
@@ -51,6 +52,7 @@ export function createAccessToken(input: {
   sub: string;
   email: string;
   name?: string | null;
+  role: "USER" | "ADMIN";
 }): string {
   const header = { alg: "HS256", typ: "JWT" };
   const iat = Math.floor(Date.now() / 1000);
