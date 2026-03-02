@@ -5,6 +5,8 @@ import { useAuth } from '@/composables/useAuth'
 
 const { currentUser, restoreSession } = useAuth()
 const authId = computed(() => currentUser.value?.id || '')
+const userName = computed(() => currentUser.value?.name || '')
+const userEmail = computed(() => currentUser.value?.email || '')
 
 onMounted(() => {
   restoreSession()
@@ -12,5 +14,5 @@ onMounted(() => {
 </script>
 
 <template>
-  <NotesWorkspace :auth-id="authId" />
+  <NotesWorkspace :auth-id="authId" :user-name="userName" :email="userEmail" />
 </template>

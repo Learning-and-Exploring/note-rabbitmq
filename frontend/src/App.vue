@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import BaseButton from './components/base/BaseButton.vue'
 
 const { isAuthenticated, currentUser, restoreSession, logout } = useAuth()
 const router = useRouter()
@@ -24,8 +25,7 @@ async function handleLogout() {
         <RouterLink class="brand-link" :to="homeRoute">Notes</RouterLink>
       </h1>
       <div class="topbar-right">
-        <span v-if="isAuthenticated" class="user-email">{{ currentUser?.email }}</span>
-        <button v-if="isAuthenticated" class="btn btn-secondary" @click="handleLogout">Logout</button>
+        <BaseButton v-if="isAuthenticated" class="cursor-pointer bg-red-500 hover:bg-red-600 text-white" @click="handleLogout">Logout</BaseButton>
       </div>
     </header>
 
@@ -69,6 +69,7 @@ async function handleLogout() {
 .user-email {
   font-size: 12px;
   color: #666;
+  color: white;
 }
 
 .btn {
