@@ -45,6 +45,7 @@ const shareModalOpen = ref(false)
 const shareModalCopied = ref(false)
 const editorRef = ref(null)
 const activeToolbar = ref({})
+const syncingFromEditor = ref(false)
 const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
 const saveButtonLabel = computed(() => (selectedNoteId.value ? 'Update Note' : 'Save Note'))
 const selectedNote = computed(() => notes.value.find((note) => note.id === selectedNoteId.value) || null)
@@ -78,12 +79,32 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
 }
 
+function decodeHtmlEntities(value, maxIterations = 5) {
+  let decoded = String(value ?? '')
+  const textarea = document.createElement('textarea')
+
+  for (let i = 0; i < maxIterations; i += 1) {
+    textarea.innerHTML = decoded
+    const next = textarea.value
+    if (next === decoded) break
+    decoded = next
+  }
+
+  return decoded
+}
+
+function isRichHtml(value) {
+  return /<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|h1|h2|h3|blockquote|span|a)(?:\s|>|\/)/i.test(String(value || ''))
+}
+
 function toEditorHtml(raw) {
   if (!raw) return ''
   const text = String(raw)
-  const looksLikeHtml = /<[^>]+>/.test(text)
-  if (looksLikeHtml) return text
-  return escapeHtml(text).replace(/\n/g, '<br>')
+  if (isRichHtml(text)) return text
+
+  // Normalize recursively encoded entities so re-renders do not compound `&amp;...`.
+  const normalized = decodeHtmlEntities(text)
+  return escapeHtml(normalized).replace(/\n/g, '<br>')
 }
 
 function syncEditorFromModel() {
@@ -96,7 +117,11 @@ function syncEditorFromModel() {
 
 function syncModelFromEditor() {
   if (!editorRef.value) return
+  syncingFromEditor.value = true
   content.value = editorRef.value.innerHTML
+  nextTick(() => {
+    syncingFromEditor.value = false
+  })
 }
 
 function runCommand(actionKey) {
@@ -171,6 +196,8 @@ onBeforeUnmount(() => {
 watch(
   () => content.value,
   () => {
+    if (syncingFromEditor.value) return
+    if (document.activeElement === editorRef.value) return
     nextTick(() => {
       syncEditorFromModel()
     })
