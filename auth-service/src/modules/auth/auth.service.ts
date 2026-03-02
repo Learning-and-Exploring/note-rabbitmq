@@ -146,6 +146,24 @@ export const authService = {
   },
 
   /**
+   * update name by ID
+   */
+  async updateNameById(id: string, name: string) {
+    const auth = await prisma.auth.update({
+      where: { id },
+      data: {
+        name,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true
+      }
+    })
+    return auth;
+  },
+
+  /**
    * Verify email by OTP and emit auth.email_verified.
    */
   async verifyEmail(dto: VerifyEmailDto) {
@@ -336,13 +354,13 @@ export const authService = {
       tokenType: "Bearer",
       accessTokenExpiresIn: getAccessTokenTtlSeconds(),
       data: {
-        id: auth.id,
+        // id: auth.id,
         email: auth.email,
         name: auth.name,
-        role: auth.role,
+        // role: auth.role,
         emailVerifiedAt: auth.emailVerifiedAt,
-        createdAt: auth.createdAt,
-        updatedAt: auth.updatedAt,
+        // createdAt: auth.createdAt,
+        // updatedAt: auth.updatedAt,
       },
     };
   },
