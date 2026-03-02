@@ -18,6 +18,16 @@ function isPublicAuthRoute(req: Request): boolean {
   return false;
 }
 
+function isAdminOnlyRoute(req: Request): boolean {
+  const path = getPathWithoutQuery(req.originalUrl);
+
+  if (path === "/users" || path.startsWith("/users/")) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Verifies Bearer access token for protected routes.
  */
@@ -42,7 +52,12 @@ export function authMiddleware(
   }
 
   try {
-    verifyAccessToken(token);
+    const payload = verifyAccessToken(token);
+
+    if (isAdminOnlyRoute(req) && payload.role !== "ADMIN") {
+      res.status(403).json({ message: "Admin access required." });
+      return;
+    }
   } catch (_error) {
     res.status(401).json({ message: "Invalid or expired access token." });
     return;

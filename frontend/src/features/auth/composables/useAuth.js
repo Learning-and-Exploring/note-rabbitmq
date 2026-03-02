@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const LEGACY_STORAGE_KEY = 'notionui.auth'
 
@@ -6,6 +6,7 @@ const initialized = ref(false)
 const isAuthenticated = ref(false)
 const currentUser = ref(null)
 const accessToken = ref('')
+const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 const authStatus = ref('')
 let restorePromise = null
 
@@ -229,6 +230,7 @@ function getAccessToken() {
 export function useAuth() {
   return {
     isAuthenticated,
+    isAdmin,
     currentUser,
     authStatus,
     authMode,

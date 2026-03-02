@@ -1,5 +1,6 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import userRoutes from "./modules/user/user.routes";
+import { requireAdminMiddleware } from "./middleware/admin.middleware";
 
 const app: Application = express();
 
@@ -8,7 +9,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
-app.use("/users", userRoutes);
+app.use("/users", requireAdminMiddleware, userRoutes);
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 import { useNotes } from '@/features/notes/composables/useNotes'
 
@@ -15,6 +16,10 @@ const props = defineProps({
   email: {
     type: String,
     default: '',
+  },
+  isAdmin: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -313,6 +318,13 @@ async function copyShareLink() {
           <p class="text-xs text-neutral-500">{{ noteCountLabel }}</p>
         </div>
         <div class="flex gap-2">
+          <RouterLink
+            v-if="isAdmin"
+            to="/admin/users"
+            class="inline-flex items-center rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+          >
+            Admin Users
+          </RouterLink>
           <BaseButton variant="secondary" @click="loadNotes(authId)">Reload</BaseButton>
           <BaseButton variant="secondary" @click="handleNewDraft">New Draft</BaseButton>
         </div>
