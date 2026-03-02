@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 import { useNotes } from '@/features/notes/composables/useNotes'
 
@@ -18,7 +18,23 @@ const props = defineProps({
   },
 })
 
-const { notes, title, content, status, preview, resetEditor, loadNotes, selectNote, saveNote, clearAll } = useNotes()
+const {
+  notes,
+  title,
+  content,
+  status,
+  selectedNoteId,
+  deletingNoteId,
+  preview,
+  resetEditor,
+  loadNotes,
+  selectNote,
+  saveNote,
+  deleteNote,
+  clearAll,
+} = useNotes()
+const deleteCandidate = ref(null)
+const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
 
 watch(
   () => props.authId,
@@ -34,75 +50,117 @@ onMounted(() => {
     loadNotes(props.authId)
   }
 })
+
+function openDeleteModal(note) {
+  deleteCandidate.value = note
+}
+
+function closeDeleteModal() {
+  deleteCandidate.value = null
+}
+
+async function confirmDelete() {
+  if (!deleteCandidate.value) return
+  const noteId = deleteCandidate.value.id
+  closeDeleteModal()
+  await deleteNote(noteId, props.authId)
+}
 </script>
 
 <template>
-  <main class="mx-auto flex max-w-[1480px] flex-col gap-4 p-5 xl:flex-row">
-    <aside class="w-full rounded-xl border border-neutral-200 bg-white p-4 xl:w-80">
-      <h2 class="mb-2.5 text-sm font-semibold text-neutral-900">Workspace</h2>
-      <!-- <input
-        :value="userName || 'Unnamed User'"
-        class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-neutral-700 mb-2"
-        disabled
-      />
-      <input
-        :value="email || 'No email'"
-        class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm text-neutral-700"
-        disabled
-      /> -->
-      <div class="space-y-4 p-4 bg-white rounded-xl border border-neutral-100 shadow-sm">
-        <div class="group">
-          <label class="text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Account Name</label>
-          <div
-            class="flex items-center mt-1 w-full rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-3 transition-colors group-hover:bg-neutral-100">
-            <span class="text-sm font-medium text-neutral-800">
-              {{ userName || 'Unnamed User' }}
-            </span>
-          </div>
+  <main class="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-4 overflow-x-hidden p-5 lg:grid-cols-12">
+    <aside class="min-w-0 rounded-xl border border-neutral-200 bg-white p-4 lg:col-span-4">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base font-semibold text-neutral-900">Workspace</h2>
+          <p class="text-xs text-neutral-500">{{ noteCountLabel }}</p>
         </div>
-
-        <div class="group">
-          <label class="text-xs font-semibold text-neutral-400 uppercase tracking-wider ml-1">Email Address</label>
-          <div
-            class="flex items-center mt-1 w-full rounded-lg bg-neutral-50 border border-neutral-200 px-3 py-3 transition-colors group-hover:bg-neutral-100">
-            <span class="text-sm text-neutral-600">
-              {{ email || 'No email provided' }}
-            </span>
-          </div>
+        <div class="flex gap-2">
+          <BaseButton variant="secondary" @click="loadNotes(authId)">Reload</BaseButton>
+          <BaseButton variant="secondary" @click="resetEditor">New Draft</BaseButton>
         </div>
       </div>
-      <BaseButton class="mt-2" variant="secondary" @click="loadNotes(authId)">
-        Reload Notes
-      </BaseButton>
 
-      <div class="mt-3 grid gap-2">
-        <button v-for="note in notes" :key="note.id"
-          class="w-full rounded-lg border border-neutral-200 bg-white p-2.5 text-left hover:bg-neutral-50"
-          @click="selectNote(note.id)">
-          <p class="text-sm font-semibold text-neutral-900 ">{{ note.title || 'Untitled Note' }}</p>
-          <p class="mt-1 text-xs text-neutral-500">{{ preview(note.content) }}</p>
-        </button>
-        <p v-if="notes.length === 0" class="mt-2 text-xs text-neutral-500">No notes yet.</p>
+      <div class="mb-4 grid gap-3 rounded-xl border border-neutral-100 bg-neutral-50 p-3 md:grid-cols-2">
+        <div class="rounded-lg bg-white p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Name</p>
+          <p class="mt-1 truncate text-sm font-medium text-neutral-800">{{ userName || 'Unnamed User' }}</p>
+        </div>
+        <div class="rounded-lg bg-white p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Email</p>
+          <p class="mt-1 truncate text-sm text-neutral-700">{{ email || 'No email provided' }}</p>
+        </div>
+      </div>
+
+      <div class="grid max-h-96 gap-2 overflow-y-auto pr-1">
+        <div
+          v-for="note in notes"
+          :key="note.id"
+          class="flex h-24 min-w-0 items-start gap-2 rounded-lg border p-2 transition-colors"
+          :class="note.id === selectedNoteId ? 'border-blue-400 bg-blue-50/40' : 'border-neutral-200 bg-white hover:bg-neutral-50'"
+        >
+          <button
+            class="flex h-full min-w-0 flex-1 flex-col justify-start overflow-hidden rounded-md px-1 py-0.5 text-left"
+            @click="selectNote(note.id)"
+          >
+            <p class="truncate text-sm font-semibold text-neutral-900">{{ note.title || 'Untitled Note' }}</p>
+            <p class="mt-1 truncate text-xs text-neutral-500">{{ preview(note.content) }}</p>
+          </button>
+          <BaseButton
+            variant="ghost"
+            class="shrink-0 border-red-200 text-red-600 hover:bg-red-50"
+            :disabled="deletingNoteId === note.id"
+            @click="openDeleteModal(note)"
+          >
+            {{ deletingNoteId === note.id ? 'Deleting...' : 'Delete' }}
+          </BaseButton>
+        </div>
+        <p v-if="notes.length === 0" class="rounded-lg border border-dashed border-neutral-300 p-4 text-center text-xs text-neutral-500">
+          No notes yet. Create your first note below.
+        </p>
       </div>
     </aside>
 
-    <section class="min-h-[70vh] flex-1 rounded-xl border border-neutral-200 bg-white p-6">
-      <p class="mb-5 text-4xl">📝</p>
-      <input v-model="title" class="mb-2.5 w-full border-0 text-4xl font-bold text-neutral-900 outline-none"
-        placeholder="Untitled" />
-      <textarea v-model="content"
-        class="min-h-[50vh] w-full resize-y border-0 text-[17px] leading-8 text-neutral-800 outline-none"
-        placeholder="Type Here" />
-
-      <div class="mt-4 flex flex-wrap items-center gap-2.5">
-        <BaseButton @click="saveNote(authId)">
-          Save Note
-        </BaseButton>
-        <BaseButton variant="secondary" @click="resetEditor">
-          New Draft
-        </BaseButton>
+    <section class="min-w-0 flex h-[72vh] flex-col rounded-xl border border-neutral-200 bg-white lg:col-span-8">
+      <div class="border-b border-neutral-200 px-6 py-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-neutral-400">Editor</p>
+        <input
+          v-model="title"
+          class="mt-2 w-full border-0 p-0 text-3xl font-bold text-neutral-900 outline-none"
+          placeholder="Untitled"
+        />
+      </div>
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col px-6 py-4">
+        <textarea
+          v-model="content"
+          class="min-h-0 min-w-0 flex-1 resize-none overflow-y-auto border-0 p-0 text-base leading-8 text-neutral-800 outline-none"
+          placeholder="Write your ideas here..."
+        />
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-6 py-4">
         <span class="text-xs text-neutral-500">{{ status }}</span>
+        <BaseButton size="md" @click="saveNote(authId)">Save Note</BaseButton>
       </div>
     </section>
   </main>
+
+  <div
+    v-if="deleteCandidate"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeDeleteModal"
+  >
+    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+      <h3 class="text-base font-semibold text-neutral-900">Delete Note?</h3>
+      <p class="mt-2 text-sm text-neutral-600">
+        This action cannot be undone.
+      </p>
+      <p class="mt-1 truncate text-sm text-neutral-700">
+        "{{ deleteCandidate?.title || 'Untitled Note' }}"
+      </p>
+      <div class="mt-5 flex justify-end gap-2">
+        <BaseButton variant="secondary" @click="closeDeleteModal">Cancel</BaseButton>
+        <BaseButton class="bg-red-600 hover:bg-red-700" @click="confirmDelete">Delete</BaseButton>
+      </div>
+    </div>
+  </div>
 </template>

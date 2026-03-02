@@ -1,4 +1,5 @@
 import { prisma } from "../../shared/database";
+import { Prisma } from "@prisma/client";
 import { CreateNoteDto } from "./note.model";
 
 export const noteService = {
@@ -45,9 +46,14 @@ export const noteService = {
    * Delete a single note by ID
    */
   async deleteNoteById(id: string) {
-    const note = await prisma.note.delete({ where: { id } });
-    if (!note) throw new Error("Note not found.");
-    return note;
+    try {
+      return await prisma.note.delete({ where: { id } });
+    } catch (err: unknown) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        throw new Error("Note not found.");
+      }
+      throw err;
+    }
   },
 
 

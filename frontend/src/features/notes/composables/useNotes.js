@@ -6,6 +6,8 @@ export function useNotes() {
   const title = ref('')
   const content = ref('')
   const status = ref('Ready')
+  const selectedNoteId = ref('')
+  const deletingNoteId = ref('')
   const { getAccessToken, expireSession } = useAuth()
 
   function authHeaders(baseHeaders = {}) {
@@ -17,7 +19,13 @@ export function useNotes() {
     }
   }
 
+  function handleUnauthorized(payload) {
+    expireSession(payload?.message || 'Session expired. Please login again.')
+    status.value = 'Session expired. Please login again.'
+  }
+
   function resetEditor() {
+    selectedNoteId.value = ''
     title.value = ''
     content.value = ''
     status.value = 'New draft'
@@ -25,7 +33,9 @@ export function useNotes() {
 
   function preview(value) {
     if (!value) return 'No content'
-    return value.slice(0, 70)
+    const compact = value.replace(/\s+/g, ' ').trim()
+    if (compact.length <= 70) return compact
+    return `${compact.slice(0, 70)}...`
   }
 
   async function loadNotes(authId) {
@@ -72,6 +82,7 @@ export function useNotes() {
         return
       }
       const note = payload.data
+      selectedNoteId.value = note?.id || ''
       title.value = note?.title || ''
       content.value = note?.content || ''
       status.value = 'Loaded note'
@@ -116,8 +127,56 @@ export function useNotes() {
     }
   }
 
+  async function deleteNote(id, authId) {
+    if (!id) {
+      status.value = 'Missing note id'
+      return
+    }
+
+    deletingNoteId.value = id
+    status.value = 'Deleting...'
+    try {
+      const res = await fetch(`/api/notes/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+
+      let payload = {}
+      try {
+        payload = await res.json()
+      } catch {
+        payload = {}
+      }
+
+      if (res.status === 401) {
+        handleUnauthorized(payload)
+        return
+      }
+
+      if (!res.ok) {
+        status.value = payload.message || 'Delete failed'
+        return
+      }
+
+      if (selectedNoteId.value === id) {
+        resetEditor()
+      }
+
+      status.value = 'Deleted'
+      if (authId?.trim()) {
+        await loadNotes(authId)
+      }
+    } catch (err) {
+      console.error(err)
+      status.value = 'Delete failed'
+    } finally {
+      deletingNoteId.value = ''
+    }
+  }
+
   function clearAll() {
     notes.value = []
+    selectedNoteId.value = ''
     title.value = ''
     content.value = ''
     status.value = 'Ready'
@@ -128,15 +187,14 @@ export function useNotes() {
     title,
     content,
     status,
+    selectedNoteId,
+    deletingNoteId,
     preview,
     resetEditor,
     loadNotes,
     selectNote,
     saveNote,
+    deleteNote,
     clearAll,
   }
 }
-  function handleUnauthorized(payload) {
-    expireSession(payload?.message || 'Session expired. Please login again.')
-    status.value = 'Session expired. Please login again.'
-  }

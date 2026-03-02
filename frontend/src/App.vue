@@ -36,6 +36,7 @@ async function handleLogout() {
 <style scoped>
 .page {
   min-height: 100vh;
+  overflow-x: hidden;
   background: #fbfbfa;
   color: #37352f;
 }

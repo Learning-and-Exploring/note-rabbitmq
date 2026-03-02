@@ -75,9 +75,9 @@ export const noteController = {
 
   async deleteNoteById(req: Request, res: Response) {
     try {
-      const {id} = req.params;
-      const note = await noteService.deleteNoteById(id as string);
-      res.status(204)
+      const { id } = req.params;
+      await noteService.deleteNoteById(id as string);
+      res.status(200).json({ message: "Note deleted." });
     } catch (err: any) {
       if (err.message === "Note not found.") {
         res.status(404).json({ message: err.message });
@@ -87,5 +87,5 @@ export const noteController = {
           .json({ message: "Internal server error.", detail: err.message });
       }
     }
-  }
+  },
 };
