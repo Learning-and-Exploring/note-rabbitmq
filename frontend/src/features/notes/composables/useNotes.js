@@ -8,6 +8,8 @@ export function useNotes() {
   const status = ref('Ready')
   const selectedNoteId = ref('')
   const deletingNoteId = ref('')
+  const savedTitle = ref('')
+  const savedContent = ref('')
   const { getAccessToken, expireSession } = useAuth()
 
   function authHeaders(baseHeaders = {}) {
@@ -24,11 +26,21 @@ export function useNotes() {
     status.value = 'Session expired. Please login again.'
   }
 
+  function syncSavedSnapshot() {
+    savedTitle.value = title.value
+    savedContent.value = content.value
+  }
+
+  function hasUnsavedChanges() {
+    return title.value !== savedTitle.value || content.value !== savedContent.value
+  }
+
   function resetEditor() {
     selectedNoteId.value = ''
     title.value = ''
     content.value = ''
     status.value = 'New draft'
+    syncSavedSnapshot()
   }
 
   function preview(value) {
@@ -94,6 +106,7 @@ export function useNotes() {
       title.value = note?.title || ''
       content.value = note?.content || ''
       status.value = 'Loaded note'
+      syncSavedSnapshot()
     } catch (err) {
       console.error(err)
       status.value = 'Failed to load note'
@@ -140,9 +153,16 @@ export function useNotes() {
       }
 
       status.value = isUpdate ? 'Updated' : 'Saved'
-      if (isUpdate && payload?.data?.id) {
+      if (payload?.data?.id) {
         selectedNoteId.value = payload.data.id
       }
+      if (payload?.data?.title !== undefined) {
+        title.value = payload.data.title || ''
+      }
+      if (payload?.data?.content !== undefined) {
+        content.value = payload.data.content || ''
+      }
+      syncSavedSnapshot()
       await loadNotes(authId)
     } catch (err) {
       console.error(err)
@@ -203,6 +223,7 @@ export function useNotes() {
     title.value = ''
     content.value = ''
     status.value = 'Ready'
+    syncSavedSnapshot()
   }
 
   return {
@@ -212,6 +233,7 @@ export function useNotes() {
     status,
     selectedNoteId,
     deletingNoteId,
+    hasUnsavedChanges,
     preview,
     resetEditor,
     loadNotes,

@@ -25,6 +25,7 @@ const {
   status,
   selectedNoteId,
   deletingNoteId,
+  hasUnsavedChanges,
   preview,
   resetEditor,
   loadNotes,
@@ -34,6 +35,8 @@ const {
   clearAll,
 } = useNotes()
 const deleteCandidate = ref(null)
+const unsavedModalOpen = ref(false)
+const pendingAction = ref(null)
 const editorRef = ref(null)
 const activeToolbar = ref({})
 const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
@@ -177,6 +180,55 @@ async function confirmDelete() {
   closeDeleteModal()
   await deleteNote(noteId, props.authId)
 }
+
+function askUnsaved(action) {
+  pendingAction.value = action
+  unsavedModalOpen.value = true
+}
+
+function closeUnsavedModal() {
+  pendingAction.value = null
+  unsavedModalOpen.value = false
+}
+
+async function proceedPendingAction() {
+  if (!pendingAction.value) return
+
+  if (pendingAction.value.type === 'select') {
+    await selectNote(pendingAction.value.noteId)
+  } else if (pendingAction.value.type === 'newDraft') {
+    resetEditor()
+  }
+
+  closeUnsavedModal()
+}
+
+async function handleSelectNote(noteId) {
+  if (selectedNoteId.value === noteId) return
+  if (hasUnsavedChanges()) {
+    askUnsaved({ type: 'select', noteId })
+    return
+  }
+  await selectNote(noteId)
+}
+
+function handleNewDraft() {
+  if (hasUnsavedChanges()) {
+    askUnsaved({ type: 'newDraft' })
+    return
+  }
+  resetEditor()
+}
+
+async function saveThenContinue() {
+  await saveNote(props.authId)
+  if (hasUnsavedChanges()) return
+  await proceedPendingAction()
+}
+
+async function discardThenContinue() {
+  await proceedPendingAction()
+}
 </script>
 
 <template>
@@ -189,7 +241,7 @@ async function confirmDelete() {
         </div>
         <div class="flex gap-2">
           <BaseButton variant="secondary" @click="loadNotes(authId)">Reload</BaseButton>
-          <BaseButton variant="secondary" @click="resetEditor">New Draft</BaseButton>
+          <BaseButton variant="secondary" @click="handleNewDraft">New Draft</BaseButton>
         </div>
       </div>
 
@@ -213,7 +265,7 @@ async function confirmDelete() {
         >
           <button
             class="flex h-full min-w-0 flex-1 flex-col justify-start overflow-hidden rounded-md px-1 py-0.5 text-left"
-            @click="selectNote(note.id)"
+            @click="handleSelectNote(note.id)"
           >
             <p class="truncate text-sm font-semibold text-neutral-900">{{ note.title || 'Untitled Note' }}</p>
             <p class="mt-1 truncate text-xs text-neutral-500">{{ preview(note.content) }}</p>
@@ -295,6 +347,24 @@ async function confirmDelete() {
       <div class="mt-5 flex justify-end gap-2">
         <BaseButton variant="secondary" @click="closeDeleteModal">Cancel</BaseButton>
         <BaseButton class="bg-red-600 hover:bg-red-700" @click="confirmDelete">Delete</BaseButton>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-if="unsavedModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeUnsavedModal"
+  >
+    <div class="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+      <h3 class="text-base font-semibold text-neutral-900">Unsaved changes</h3>
+      <p class="mt-2 text-sm text-neutral-600">
+        You have unsaved changes. Do you want to save before continuing?
+      </p>
+      <div class="mt-5 flex flex-wrap justify-end gap-2">
+        <BaseButton variant="secondary" @click="closeUnsavedModal">Cancel</BaseButton>
+        <BaseButton variant="secondary" @click="discardThenContinue">Discard</BaseButton>
+        <BaseButton @click="saveThenContinue">Save & Continue</BaseButton>
       </div>
     </div>
   </div>
