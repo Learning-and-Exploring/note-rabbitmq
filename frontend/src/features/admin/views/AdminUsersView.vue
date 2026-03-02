@@ -11,18 +11,33 @@ const { currentUser, isAuthenticated, isAdmin, restoreSession, getAccessToken } 
 const users = ref([])
 const loading = ref(false)
 const status = ref('')
+const page = ref(1)
+const limit = ref(10)
+const totalUsers = ref(0)
+const totalPages = ref(1)
 const deletingUserId = ref('')
 const pendingDeleteUser = ref(null)
+const viewingUserId = ref('')
+const detailLoading = ref(false)
+const detailStatus = ref('')
+const selectedUserDetail = ref(null)
 
 const currentUserId = computed(() => currentUser.value?.id || '')
+const canPrevPage = computed(() => page.value > 1 && !loading.value)
+const canNextPage = computed(() => page.value < totalPages.value && !loading.value)
 
-async function fetchUsers() {
+async function fetchUsers(requestedPage = page.value) {
   loading.value = true
   status.value = 'Loading users...'
 
   try {
     const token = getAccessToken()
-    const res = await fetch('/api/users', {
+    const safePage = Math.max(1, Number(requestedPage) || 1)
+    const params = new URLSearchParams({
+      page: String(safePage),
+      limit: String(limit.value),
+    })
+    const res = await fetch(`/api/users?${params.toString()}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -36,13 +51,81 @@ async function fetchUsers() {
     }
 
     users.value = Array.isArray(payload.data) ? payload.data : []
-    status.value = `Loaded ${users.value.length} users`
-    console.log(users);
-    
+    const pagination = payload.pagination || {}
+    page.value = Number(pagination.page) || safePage
+    limit.value = Number(pagination.limit) || limit.value
+    totalUsers.value = Number(pagination.total) || users.value.length
+    totalPages.value = Math.max(1, Number(pagination.totalPages) || 1)
+
+    if (totalUsers.value === 0) {
+      status.value = 'No users found'
+      return
+    }
+
+    const start = (page.value - 1) * limit.value + 1
+    const end = Math.min(page.value * limit.value, totalUsers.value)
+    status.value = `Showing ${start}-${end} of ${totalUsers.value} users`
   } catch {
     status.value = 'Failed to load users'
   } finally {
     loading.value = false
+  }
+}
+
+async function goToPage(nextPage) {
+  if (loading.value) return
+  if (nextPage < 1 || nextPage > totalPages.value) return
+  await fetchUsers(nextPage)
+}
+
+async function onLimitChange() {
+  page.value = 1
+  await fetchUsers(1)
+}
+
+function formatDate(value) {
+  if (!value) return 'N/A'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'N/A'
+  return date.toLocaleString()
+}
+
+function closeDetailsDialog() {
+  if (detailLoading.value) return
+  viewingUserId.value = ''
+  detailStatus.value = ''
+  selectedUserDetail.value = null
+}
+
+async function openDetailsDialog(user) {
+  if (!user?.id) return
+
+  viewingUserId.value = user.id
+  detailLoading.value = true
+  detailStatus.value = 'Loading user details...'
+  selectedUserDetail.value = null
+
+  try {
+    const token = getAccessToken()
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      detailStatus.value = payload.message || 'Failed to load user details'
+      return
+    }
+
+    selectedUserDetail.value = payload.data || null
+    detailStatus.value = ''
+  } catch {
+    detailStatus.value = 'Failed to load user details'
+  } finally {
+    detailLoading.value = false
   }
 }
 
@@ -85,8 +168,11 @@ async function confirmDeleteUser() {
       return
     }
 
-    users.value = users.value.filter((user) => user.id !== userId)
-    status.value = 'User deleted'
+    await fetchUsers(page.value)
+    if (users.value.length === 0 && page.value > 1) {
+      await fetchUsers(page.value - 1)
+    }
+    status.value = `User deleted. ${status.value}`
   } catch {
     status.value = 'Failed to delete user'
   } finally {
@@ -119,8 +205,22 @@ onMounted(async () => {
           <h1 class="text-xl font-semibold text-neutral-900">Admin Users</h1>
           <p class="text-sm text-neutral-500">Manage user accounts</p>
         </div>
-        <div class="flex gap-2">
-          <BaseButton variant="secondary" :disabled="loading" @click="fetchUsers">Reload</BaseButton>
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="inline-flex items-center gap-2 text-xs font-medium text-neutral-600">
+            Per page
+            <select
+              v-model.number="limit"
+              class="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700"
+              :disabled="loading"
+              @change="onLimitChange"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+            </select>
+          </label>
+          <BaseButton variant="secondary" :disabled="loading" @click="fetchUsers(page)">Reload</BaseButton>
         </div>
       </div>
 
@@ -140,7 +240,7 @@ onMounted(async () => {
           </thead>
           <tbody class="divide-y divide-neutral-100 bg-white">
             <tr v-for="user in users" :key="user.id">
-              <td class="px-4 py-3 text-neutral-800">{{ user.name || 'Unnamed User' }}</td>
+              <td class="px-4 py-3 text-neutral-800">{{ user.name || 'Unnamed' }}</td>
               <td class="px-4 py-3 text-neutral-700">{{ user.email }}</td>
               <td class="px-4 py-3 text-neutral-700">
                 <span
@@ -151,16 +251,26 @@ onMounted(async () => {
                 </span>
               </td>
               <td class="px-4 py-3 text-neutral-700">{{ user.isEmailVerified ? 'Yes' : 'No' }}</td>
-              <td class="px-4 py-3 text-neutral-700">{{ new Date(user.createdAt).toLocaleString() }}</td>
+              <td class="px-4 py-3 text-neutral-700">{{ formatDate(user.createdAt) }}</td>
               <td class="px-4 py-3 text-right">
-                <BaseButton
-                  variant="ghost"
-                  class="border-red-200 text-red-600 hover:bg-red-50"
-                  :disabled="deletingUserId === user.id || user.id === currentUserId"
-                  @click="openDeleteDialog(user)"
-                >
-                  {{ deletingUserId === user.id ? 'Deleting...' : 'Delete' }}
-                </BaseButton>
+                <div class="flex justify-end gap-2">
+                  <BaseButton
+                    variant="secondary"
+                    class="min-w-20"
+                    :disabled="detailLoading && viewingUserId === user.id"
+                    @click="openDetailsDialog(user)"
+                  >
+                    View
+                  </BaseButton>
+                  <BaseButton
+                    variant="ghost"
+                    class="border-red-200 text-red-600 hover:bg-red-50"
+                    :disabled="deletingUserId === user.id || user.id === currentUserId"
+                    @click="openDeleteDialog(user)"
+                  >
+                    {{ deletingUserId === user.id ? 'Deleting...' : 'Delete' }}
+                  </BaseButton>
+                </div>
               </td>
             </tr>
             <tr v-if="!loading && users.length === 0">
@@ -168,6 +278,14 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-xs text-neutral-500">Page {{ page }} of {{ totalPages }}</p>
+        <div class="flex items-center gap-2">
+          <BaseButton variant="secondary" :disabled="!canPrevPage" @click="goToPage(page - 1)">Previous</BaseButton>
+          <BaseButton variant="secondary" :disabled="!canNextPage" @click="goToPage(page + 1)">Next</BaseButton>
+        </div>
       </div>
     </section>
   </main>
@@ -186,6 +304,48 @@ onMounted(async () => {
       <BaseButton class="bg-red-600 hover:bg-red-700" :disabled="Boolean(deletingUserId)" @click="confirmDeleteUser">
         Delete
       </BaseButton>
+    </template>
+  </BaseModalDialog>
+
+  <BaseModalDialog
+    :open="Boolean(viewingUserId)"
+    title="User details"
+    :description="selectedUserDetail?.email || 'Inspect account details'"
+    max-width-class="max-w-lg"
+    @close="closeDetailsDialog"
+  >
+    <div class="min-h-[280px]">
+      <p v-if="detailStatus" class="text-sm text-neutral-600">{{ detailStatus }}</p>
+      <div v-else-if="selectedUserDetail" class="grid gap-3 text-sm text-neutral-700">
+        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Name</p>
+          <p class="mt-1 text-neutral-900">{{ selectedUserDetail.name || 'Unnamed' }}</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Role</p>
+          <p class="mt-1 text-neutral-900">{{ selectedUserDetail.role || 'USER' }}</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Email Verified</p>
+          <p class="mt-1 text-neutral-900">{{ selectedUserDetail.isEmailVerified ? 'Yes' : 'No' }}</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Created At</p>
+          <p class="mt-1 text-neutral-900">{{ formatDate(selectedUserDetail.createdAt) }}</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Updated At</p>
+          <p class="mt-1 text-neutral-900">{{ formatDate(selectedUserDetail.updatedAt) }}</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">User ID</p>
+          <p class="mt-1 break-all font-mono text-xs text-neutral-800">{{ selectedUserDetail.id }}</p>
+        </div>
+      </div>
+    </div>
+
+    <template #actions>
+      <BaseButton variant="secondary" :disabled="detailLoading" @click="closeDetailsDialog">Close</BaseButton>
     </template>
   </BaseModalDialog>
 </template>

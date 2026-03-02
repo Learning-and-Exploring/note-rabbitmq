@@ -110,21 +110,28 @@ export const userService = {
   /**
    * Return all users (safe fields only).
    */
-  async getAllUsers() {
-    return prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        avatarUrl: true,
-        isEmailVerified: true,
-        emailVerifiedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+  async getAllUsers(input: { page: number; limit: number; skip: number }) {
+    const [total, users] = await prisma.$transaction([
+      prisma.user.count(),
+      prisma.user.findMany({
+        skip: input.skip,
+        take: input.limit,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          avatarUrl: true,
+          isEmailVerified: true,
+          emailVerifiedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    return { total, users };
   },
 
   /**

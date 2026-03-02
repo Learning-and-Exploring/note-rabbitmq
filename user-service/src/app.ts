@@ -1,4 +1,5 @@
 import express, { Application, Request, Response, NextFunction } from "express";
+import paginate from "express-paginate";
 import userRoutes from "./modules/user/user.routes";
 import { requireAdminMiddleware } from "./middleware/admin.middleware";
 
@@ -7,6 +8,7 @@ const app: Application = express();
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(paginate.middleware(10, 100));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use("/users", requireAdminMiddleware, userRoutes);

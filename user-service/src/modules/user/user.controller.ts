@@ -4,12 +4,32 @@ import { userService } from "./user.service";
 export const userController = {
   /**
    * GET /users
-   * Return all users.
+   * Return paginated users.
+   * Query: ?page=1&limit=10
    */
-  async getAllUsers(_req: Request, res: Response) {
+  async getAllUsers(req: Request, res: Response) {
     try {
-      const users = await userService.getAllUsers();
-      res.status(200).json({ data: users });
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const limit = Math.max(0, Number(req.query.limit) || 10);
+      const skip = (page - 1) * limit;
+      const { users, total } = await userService.getAllUsers({ page, limit, skip });
+
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const safePage = Math.min(page, totalPages);
+
+      res.status(200).json({
+        data: users,
+        pagination: {
+          page: safePage,
+          limit,
+          total,
+          totalPages,
+          hasPrevPage: safePage > 1,
+          hasNextPage: safePage < totalPages,
+          prevPage: safePage > 1 ? safePage - 1 : null,
+          nextPage: safePage < totalPages ? safePage + 1 : null,
+        },
+      });
     } catch (error: any) {
       res
         .status(500)

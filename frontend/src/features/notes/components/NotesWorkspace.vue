@@ -405,7 +405,7 @@ async function saveName() {
               Edit
             </button>
           </div>
-          <p class="mt-1 truncate text-sm font-medium text-neutral-800">{{ userName || 'Unnamed User' }}</p>
+          <p class="mt-1 truncate text-sm font-medium text-neutral-800">{{ userName || 'Unnamed' }}</p>
         </div>
         <div class="rounded-lg bg-white p-3">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Email</p>

@@ -29,7 +29,19 @@ function isAdminOnlyRoute(req) {
     if (path === "/users" || path.startsWith("/users/")) {
         return true;
     }
+    if (req.method === "GET" && path === "/auths") {
+        return true;
+    }
     return false;
+}
+function getAuthIdParam(path) {
+    const changeNameMatch = path.match(/^\/auths\/change-name\/([^/]+)$/);
+    if (changeNameMatch?.[1])
+        return changeNameMatch[1];
+    const authByIdMatch = path.match(/^\/auths\/([^/]+)$/);
+    if (authByIdMatch?.[1])
+        return authByIdMatch[1];
+    return null;
 }
 /**
  * Verifies Bearer access token for protected routes.
@@ -49,9 +61,21 @@ function authMiddleware(req, res, next) {
     }
     try {
         const payload = (0, token_1.verifyAccessToken)(token);
+        const path = getPathWithoutQuery(req.originalUrl);
         if (isAdminOnlyRoute(req) && payload.role !== "ADMIN") {
             res.status(403).json({ message: "Admin access required." });
             return;
+        }
+        const authIdInPath = getAuthIdParam(path);
+        const isAuthGetById = req.method === "GET" && /^\/auths\/[^/]+$/.test(path);
+        const isAuthChangeNameById = req.method === "PATCH" && /^\/auths\/change-name\/[^/]+$/.test(path);
+        if ((isAuthGetById || isAuthChangeNameById) && authIdInPath) {
+            const isOwner = payload.sub === authIdInPath;
+            const isAdmin = payload.role === "ADMIN";
+            if (!isOwner && !isAdmin) {
+                res.status(403).json({ message: "Forbidden: insufficient permissions." });
+                return;
+            }
         }
     }
     catch (_error) {
