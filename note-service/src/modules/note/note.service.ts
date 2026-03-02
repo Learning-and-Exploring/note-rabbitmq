@@ -1,4 +1,6 @@
 import { prisma } from "../../shared/database";
+import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { CreateNoteDto } from "./note.model";
 
 export const noteService = {
@@ -45,8 +47,90 @@ export const noteService = {
    * Delete a single note by ID
    */
   async deleteNoteById(id: string) {
-    const note = await prisma.note.delete({ where: { id } });
-    if (!note) throw new Error("Note not found.");
+    try {
+      return await prisma.note.delete({ where: { id } });
+    } catch (err: unknown) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        throw new Error("Note not found.");
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Update a single note by ID
+   */
+  async updateNoteById(id: string, data: { title?: string; content?: string }) {
+    try {
+      return await prisma.note.update({
+        where: { id },
+        data,
+      });
+    } catch (err: unknown) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        throw new Error("Note not found.");
+      }
+      throw err;
+    }
+  },
+
+  async shareNoteById(id: string, authId: string) {
+    const note = await prisma.note.findFirst({
+      where: { id, authId },
+      select: { id: true },
+    });
+
+    if (!note) {
+      throw new Error("Note not found.");
+    }
+
+    const shareToken = crypto.randomBytes(24).toString("hex");
+    return prisma.note.update({
+      where: { id },
+      data: {
+        isPublic: true,
+        shareToken,
+      },
+    });
+  },
+
+  async unshareNoteById(id: string, authId: string) {
+    const note = await prisma.note.findFirst({
+      where: { id, authId },
+      select: { id: true },
+    });
+
+    if (!note) {
+      throw new Error("Note not found.");
+    }
+
+    return prisma.note.update({
+      where: { id },
+      data: {
+        isPublic: false,
+        shareToken: null,
+      },
+    });
+  },
+
+  async getPublicNoteByToken(shareToken: string) {
+    const note = await prisma.note.findFirst({
+      where: {
+        shareToken,
+        isPublic: true,
+      },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!note) {
+      throw new Error("Shared note not found.");
+    }
+
     return note;
   },
 

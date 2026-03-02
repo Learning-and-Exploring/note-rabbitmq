@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
-import BaseButton from './components/base/BaseButton.vue'
+import { useAuth } from '@/features/auth/composables/useAuth'
+import BaseButton from '@/shared/components/base/BaseButton.vue'
 
 const { isAuthenticated, currentUser, restoreSession, logout } = useAuth()
 const router = useRouter()
@@ -36,6 +36,7 @@ async function handleLogout() {
 <style scoped>
 .page {
   min-height: 100vh;
+  overflow-x: hidden;
   background: #fbfbfa;
   color: #37352f;
 }

@@ -12,6 +12,8 @@ model Note {
   authId    String   @map("auth_id")
   title     String   @default("Welcome Note")
   content   String?
+  isPublic  Boolean  @default(false) @map("is_public")
+  shareToken String? @unique @map("share_token")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

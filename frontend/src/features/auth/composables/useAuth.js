@@ -1,13 +1,13 @@
 import { ref } from 'vue'
 
-const STORAGE_KEY = 'notionui.auth'
+const LEGACY_STORAGE_KEY = 'notionui.auth'
 
 const initialized = ref(false)
 const isAuthenticated = ref(false)
 const currentUser = ref(null)
 const accessToken = ref('')
-const refreshToken = ref('')
 const authStatus = ref('')
+let restorePromise = null
 
 const authMode = ref('login')
 const registerName = ref('')
@@ -18,44 +18,77 @@ const loginPassword = ref('')
 const verifyEmail = ref('')
 const verifyOtp = ref('')
 
-function persistSession() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      accessToken: accessToken.value,
-      refreshToken: refreshToken.value,
-      user: currentUser.value,
-    }),
-  )
+function maskEmail(value) {
+  const raw = String(value || '').trim()
+  const at = raw.indexOf('@')
+  if (at <= 0) return raw
+
+  const name = raw.slice(0, at)
+  const domain = raw.slice(at + 1)
+  const visible = name.slice(0, Math.min(3, name.length))
+  return `${visible}***@${domain}`
+}
+
+function clearLegacyStorage() {
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
+  } catch {
+    // Ignore storage errors in restricted environments.
+  }
 }
 
 function clearSession() {
-  localStorage.removeItem(STORAGE_KEY)
+  clearLegacyStorage()
   accessToken.value = ''
-  refreshToken.value = ''
   currentUser.value = null
   isAuthenticated.value = false
 }
 
-function restoreSession() {
-  if (initialized.value) return
-  initialized.value = true
+function expireSession(message = 'Session expired. Please login again.') {
+  clearSession()
+  authStatus.value = message
+}
 
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return
+async function restoreSession() {
+  clearLegacyStorage()
 
-  try {
-    const parsed = JSON.parse(raw)
-    accessToken.value = parsed.accessToken || ''
-    refreshToken.value = parsed.refreshToken || ''
-    currentUser.value = parsed.user || null
-    isAuthenticated.value = Boolean(parsed.accessToken && parsed.user?.id)
-    if (isAuthenticated.value) {
-      authStatus.value = `Logged in as ${parsed.user.email}`
+  if (initialized.value) return isAuthenticated.value
+  if (restorePromise) return restorePromise
+
+  restorePromise = (async () => {
+    try {
+      const res = await fetch('/auth-api/auths/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      })
+
+      if (!res.ok) {
+        clearSession()
+        return false
+      }
+
+      const payload = await res.json()
+      const auth = payload.data
+      accessToken.value = auth.accessToken || ''
+      currentUser.value = auth.data || null
+      isAuthenticated.value = Boolean(accessToken.value && currentUser.value?.id)
+      if (isAuthenticated.value) {
+        authStatus.value = `Logged in as ${maskEmail(currentUser.value.email)}`
+      }
+
+      return isAuthenticated.value
+    } catch {
+      clearSession()
+      return false
+    } finally {
+      initialized.value = true
+      restorePromise = null
     }
-  } catch {
-    clearSession()
-  }
+  })()
+
+  return restorePromise
 }
 
 async function register() {
@@ -140,11 +173,13 @@ async function resendOtp() {
 }
 
 async function login() {
+  clearLegacyStorage()
   authStatus.value = 'Logging in...'
   try {
     const res = await fetch('/auth-api/auths/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({
         email: loginEmail.value,
         password: loginPassword.value,
@@ -158,11 +193,10 @@ async function login() {
 
     const auth = payload.data
     accessToken.value = auth.accessToken
-    refreshToken.value = auth.refreshToken
     currentUser.value = auth.data
     isAuthenticated.value = true
-    persistSession()
-    authStatus.value = `Logged in as ${auth.data?.email || 'user'}`
+    initialized.value = true
+    authStatus.value = `Logged in as ${maskEmail(auth.data?.email || 'user')}`
     return true
   } catch (err) {
     console.error(err)
@@ -174,19 +208,22 @@ async function login() {
 async function logout() {
   authStatus.value = 'Logging out...'
   try {
-    if (refreshToken.value) {
-      await fetch('/auth-api/auths/logout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: refreshToken.value }),
-      })
-    }
+    await fetch('/auth-api/auths/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({}),
+    })
   } catch (err) {
     console.error(err)
   }
 
   clearSession()
   authStatus.value = 'Logged out'
+}
+
+function getAccessToken() {
+  return accessToken.value
 }
 
 export function useAuth() {
@@ -208,5 +245,7 @@ export function useAuth() {
     resendOtp,
     login,
     logout,
+    getAccessToken,
+    expireSession,
   }
 }

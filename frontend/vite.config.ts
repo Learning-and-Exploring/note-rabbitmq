@@ -15,8 +15,11 @@ export default defineConfig({
   ],
   server: {
     proxy: {
+      // Route all frontend API calls through API gateway.
+      // /auth-api/* -> /auths/* and /api/* -> /notes/*
+      // Gateway default: http://localhost:3000
       '/api': {
-        target: process.env.VITE_NOTE_SERVICE_BASE_URL || 'http://localhost:3003',
+        target: process.env.VITE_GATEWAY_BASE_URL || 'http://localhost:3000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

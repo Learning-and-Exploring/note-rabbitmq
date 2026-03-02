@@ -75,9 +75,9 @@ export const noteController = {
 
   async deleteNoteById(req: Request, res: Response) {
     try {
-      const {id} = req.params;
-      const note = await noteService.deleteNoteById(id as string);
-      res.status(204)
+      const { id } = req.params;
+      await noteService.deleteNoteById(id as string);
+      res.status(200).json({ message: "Note deleted." });
     } catch (err: any) {
       if (err.message === "Note not found.") {
         res.status(404).json({ message: err.message });
@@ -87,5 +87,109 @@ export const noteController = {
           .json({ message: "Internal server error.", detail: err.message });
       }
     }
-  }
+  },
+
+  async updateNoteById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { title, content } = req.body;
+      const hasTitle = typeof title !== "undefined";
+      const hasContent = typeof content !== "undefined";
+
+      if (!hasTitle && !hasContent) {
+        res.status(400).json({ message: "title or content is required." });
+        return;
+      }
+
+      const note = await noteService.updateNoteById(id as string, {
+        title,
+        content,
+      });
+      res.status(200).json({ message: "Note updated.", data: note });
+    } catch (err: any) {
+      if (err.message === "Note not found.") {
+        res.status(404).json({ message: err.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: err.message });
+      }
+    }
+  },
+
+  async shareNoteById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { authId } = req.body;
+
+      if (!authId) {
+        res.status(400).json({ message: "authId is required." });
+        return;
+      }
+
+      const note = await noteService.shareNoteById(id as string, authId as string);
+      res.status(200).json({
+        message: "Share link enabled.",
+        data: {
+          id: note.id,
+          isPublic: note.isPublic,
+          shareToken: note.shareToken,
+        },
+      });
+    } catch (err: any) {
+      if (err.message === "Note not found.") {
+        res.status(404).json({ message: err.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: err.message });
+      }
+    }
+  },
+
+  async unshareNoteById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { authId } = req.body;
+
+      if (!authId) {
+        res.status(400).json({ message: "authId is required." });
+        return;
+      }
+
+      const note = await noteService.unshareNoteById(id as string, authId as string);
+      res.status(200).json({
+        message: "Share link disabled.",
+        data: {
+          id: note.id,
+          isPublic: note.isPublic,
+          shareToken: note.shareToken,
+        },
+      });
+    } catch (err: any) {
+      if (err.message === "Note not found.") {
+        res.status(404).json({ message: err.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: err.message });
+      }
+    }
+  },
+
+  async getPublicNoteByToken(req: Request, res: Response) {
+    try {
+      const { token } = req.params;
+      const note = await noteService.getPublicNoteByToken(token as string);
+      res.status(200).json({ data: note });
+    } catch (err: any) {
+      if (err.message === "Shared note not found.") {
+        res.status(404).json({ message: err.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: err.message });
+      }
+    }
+  },
 };

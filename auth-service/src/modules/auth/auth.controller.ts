@@ -1,6 +1,51 @@
 import { Request, Response } from "express";
 import { authService } from "./auth.service";
 
+const REFRESH_COOKIE_NAME = "refreshToken";
+
+function parseCookies(rawCookieHeader?: string): Record<string, string> {
+  if (!rawCookieHeader) return {};
+
+  return rawCookieHeader.split(";").reduce<Record<string, string>>((acc, part) => {
+    const [rawKey, ...rawValue] = part.trim().split("=");
+    if (!rawKey) return acc;
+    acc[rawKey] = decodeURIComponent(rawValue.join("=") || "");
+    return acc;
+  }, {});
+}
+
+function readRefreshTokenFromCookie(req: Request): string {
+  const cookies = parseCookies(req.headers.cookie);
+  return cookies[REFRESH_COOKIE_NAME] || "";
+}
+
+function getRefreshCookieOptions() {
+  const rawDays = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? "7");
+  const refreshDays = Number.isFinite(rawDays) && rawDays > 0 ? rawDays : 7;
+
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: Math.floor(refreshDays * 24 * 60 * 60 * 1000),
+  };
+}
+
+function setRefreshTokenCookie(res: Response, refreshToken: string): void {
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions());
+}
+
+function clearRefreshTokenCookie(res: Response): void {
+  const options = getRefreshCookieOptions();
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    httpOnly: options.httpOnly,
+    secure: options.secure,
+    sameSite: options.sameSite,
+    path: options.path,
+  });
+}
+
 export const authController = {
   /**
    * POST /auths
@@ -46,7 +91,10 @@ export const authController = {
       }
 
       const auth = await authService.login({ email, password });
-      res.status(200).json({ message: "Login successful.", data: auth });
+      setRefreshTokenCookie(res, auth.refreshToken);
+
+      const { refreshToken: _refreshToken, ...dataWithoutRefresh } = auth;
+      res.status(200).json({ message: "Login successful.", data: dataWithoutRefresh });
     } catch (error: any) {
       if (error.message === "Invalid email or password.") {
         res.status(401).json({ message: error.message });
@@ -69,7 +117,9 @@ export const authController = {
    */
   async refreshToken(req: Request, res: Response) {
     try {
-      const { refreshToken } = req.body;
+      const { refreshToken: bodyRefreshToken } = req.body ?? {};
+      const cookieRefreshToken = readRefreshTokenFromCookie(req);
+      const refreshToken = bodyRefreshToken || cookieRefreshToken;
 
       if (!refreshToken) {
         res.status(400).json({ message: "refreshToken is required." });
@@ -77,9 +127,12 @@ export const authController = {
       }
 
       const tokenBundle = await authService.refreshToken({ refreshToken });
+      setRefreshTokenCookie(res, tokenBundle.refreshToken);
+
+      const { refreshToken: _refreshToken, ...dataWithoutRefresh } = tokenBundle;
       res.status(200).json({
         message: "Token refreshed successfully.",
-        data: tokenBundle,
+        data: dataWithoutRefresh,
       });
     } catch (error: any) {
       if (error.message === "Invalid refresh token.") {
@@ -101,13 +154,15 @@ export const authController = {
    */
   async logout(req: Request, res: Response) {
     try {
-      const { refreshToken } = req.body;
-      if (!refreshToken) {
-        res.status(400).json({ message: "refreshToken is required." });
-        return;
-      }
+      const { refreshToken: bodyRefreshToken } = req.body ?? {};
+      const cookieRefreshToken = readRefreshTokenFromCookie(req);
+      const refreshToken = bodyRefreshToken || cookieRefreshToken;
 
-      const result = await authService.logout({ refreshToken });
+      const result = refreshToken
+        ? await authService.logout({ refreshToken })
+        : { revoked: false };
+
+      clearRefreshTokenCookie(res);
       res.status(200).json({
         message: "Logout completed.",
         data: result,
