@@ -1,8 +1,11 @@
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import BaseButton from '@/shared/components/base/BaseButton.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
 
 const router = useRouter()
+const uiError = ref('')
 const {
   authStatus,
   authMode,
@@ -19,123 +22,125 @@ const {
   login,
 } = useAuth()
 
+function setMode(mode) {
+  uiError.value = ''
+  authMode.value = mode
+}
+
+function isValidEmail(value) {
+  return /^\S+@\S+\.\S+$/.test(value.trim())
+}
+
+function validateRegister() {
+  if (!registerEmail.value.trim()) return 'Email is required.'
+  if (!isValidEmail(registerEmail.value)) return 'Please enter a valid email address.'
+  if (!registerPassword.value) return 'Password is required.'
+  if (registerPassword.value.length < 8) return 'Password must be at least 8 characters.'
+  return ''
+}
+
+function validateLogin() {
+  if (!loginEmail.value.trim()) return 'Email is required.'
+  if (!isValidEmail(loginEmail.value)) return 'Please enter a valid email address.'
+  if (!loginPassword.value) return 'Password is required.'
+  return ''
+}
+
+function validateVerify() {
+  if (!verifyEmail.value.trim()) return 'Email is required.'
+  if (!isValidEmail(verifyEmail.value)) return 'Please enter a valid email address.'
+  if (!/^\d{6}$/.test(verifyOtp.value.trim())) return 'OTP must be exactly 6 digits.'
+  return ''
+}
+
+function validateResend() {
+  if (!verifyEmail.value.trim()) return 'Email is required.'
+  if (!isValidEmail(verifyEmail.value)) return 'Please enter a valid email address.'
+  return ''
+}
+
+async function handleRegister() {
+  uiError.value = validateRegister()
+  if (uiError.value) return
+  await register()
+}
+
 async function handleLogin() {
+  uiError.value = validateLogin()
+  if (uiError.value) return
   const ok = await login()
   if (ok) {
     router.replace('/notes')
   }
 }
+
+async function handleVerify() {
+  uiError.value = validateVerify()
+  if (uiError.value) return
+  await verify()
+}
+
+async function handleResendOtp() {
+  uiError.value = validateResend()
+  if (uiError.value) return
+  await resendOtp()
+}
 </script>
 
 <template>
-  <main class="auth-layout">
-    <section class="auth-card">
-      <h2 class="section-title">Authentication</h2>
+  <main class="flex min-h-[calc(100vh-64px)] items-center justify-center p-6">
+    <section class="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+      <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">Welcome</p>
+      <h2 class="mb-4 text-xl font-bold text-neutral-900">Authentication</h2>
 
-      <div class="tabs">
-        <button class="tab" :class="{ active: authMode === 'login' }" @click="authMode = 'login'">Login</button>
-        <button class="tab" :class="{ active: authMode === 'register' }" @click="authMode = 'register'">Register</button>
-        <button class="tab" :class="{ active: authMode === 'verify' }" @click="authMode = 'verify'">Verify OTP</button>
+      <div class="mb-4 grid grid-cols-3 gap-2 rounded-xl bg-neutral-100 p-1">
+        <button
+          class="rounded-lg px-2 py-2 text-xs font-semibold transition-colors"
+          :class="authMode === 'login' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'"
+          @click="setMode('login')"
+        >
+          Login
+        </button>
+        <button
+          class="rounded-lg px-2 py-2 text-xs font-semibold transition-colors"
+          :class="authMode === 'register' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'"
+          @click="setMode('register')"
+        >
+          Register
+        </button>
+        <button
+          class="rounded-lg px-2 py-2 text-xs font-semibold transition-colors"
+          :class="authMode === 'verify' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'"
+          @click="setMode('verify')"
+        >
+          Verify OTP
+        </button>
       </div>
 
-      <div v-if="authMode === 'register'" class="form-grid">
-        <input v-model="registerName" class="input" placeholder="Name (optional)" />
-        <input v-model="registerEmail" class="input" placeholder="Email" type="email" />
-        <input v-model="registerPassword" class="input" placeholder="Password" type="password" />
-        <button class="btn" @click="register">Create account</button>
+      <div v-if="authMode === 'register'" class="grid gap-2.5">
+        <input v-model="registerName" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Name (optional)" />
+        <input v-model="registerEmail" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Email" type="email" />
+        <input v-model="registerPassword" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Password (min 8 chars)" type="password" />
+        <BaseButton size="md" @click="handleRegister">Create account</BaseButton>
       </div>
 
-      <div v-else-if="authMode === 'verify'" class="form-grid">
-        <input v-model="verifyEmail" class="input" placeholder="Email" type="email" />
-        <input v-model="verifyOtp" class="input" placeholder="6-digit OTP" />
-        <button class="btn" @click="verify">Verify email</button>
-        <button class="btn btn-secondary" @click="resendOtp">Resend OTP</button>
+      <div v-else-if="authMode === 'verify'" class="grid gap-2.5">
+        <input v-model="verifyEmail" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Email" type="email" />
+        <input v-model="verifyOtp" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="6-digit OTP" />
+        <BaseButton size="md" @click="handleVerify">Verify email</BaseButton>
+        <BaseButton variant="secondary" size="md" @click="handleResendOtp">Resend OTP</BaseButton>
       </div>
 
-      <div v-else class="form-grid">
-        <input v-model="loginEmail" class="input" placeholder="Email" type="email" />
-        <input v-model="loginPassword" class="input" placeholder="Password" type="password" />
-        <button class="btn" @click="handleLogin">Login</button>
+      <div v-else class="grid gap-2.5">
+        <input v-model="loginEmail" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Email" type="email" />
+        <input v-model="loginPassword" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Password" type="password" />
+        <BaseButton size="md" @click="handleLogin">Login</BaseButton>
       </div>
 
-      <p class="hint">{{ authStatus || 'Use your auth-service account.' }}</p>
+      <p v-if="uiError" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        {{ uiError }}
+      </p>
+      <p class="mt-3 text-xs text-neutral-500">{{ authStatus || 'Use your auth-service account.' }}</p>
     </section>
   </main>
 </template>
-
-<style scoped>
-.auth-layout {
-  min-height: calc(100vh - 60px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 420px;
-  border: 1px solid #ececec;
-  border-radius: 12px;
-  background: #fff;
-  padding: 20px;
-}
-
-.section-title {
-  margin: 0 0 10px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.tab {
-  border: 1px solid #ddd;
-  background: #f7f7f7;
-  border-radius: 8px;
-  font-size: 12px;
-  padding: 6px 10px;
-}
-
-.tab.active {
-  background: #eaf3fd;
-  border-color: #9fc5ef;
-}
-
-.form-grid {
-  display: grid;
-  gap: 8px;
-}
-
-.input {
-  width: 100%;
-  border: 1px solid #d8d8d8;
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.hint {
-  margin: 10px 2px 0;
-  font-size: 12px;
-  color: #888;
-}
-
-.btn {
-  border: 0;
-  border-radius: 8px;
-  background: #2383e2;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 8px 12px;
-}
-
-.btn-secondary {
-  background: #f4f4f4;
-  color: #333;
-}
-</style>
