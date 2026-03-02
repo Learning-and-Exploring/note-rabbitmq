@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const auth_middleware_1 = require("./middleware/auth.middleware");
 const auth_proxy_1 = __importDefault(require("./routes/auth.proxy"));
 const note_proxy_1 = __importDefault(require("./routes/note.proxy"));
+const public_note_proxy_1 = __importDefault(require("./routes/public-note.proxy"));
 const user_proxy_1 = __importDefault(require("./routes/user.proxy"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT ?? 3000;
@@ -18,6 +19,8 @@ app.get("/health", (_req, res) => {
 app.use("/auths", auth_middleware_1.authMiddleware, auth_proxy_1.default);
 app.use("/users", auth_middleware_1.authMiddleware, user_proxy_1.default);
 app.use("/notes", auth_middleware_1.authMiddleware, note_proxy_1.default);
+// ── Public routes (no auth required) ────────────────────────────────────────
+app.use("/public/notes", public_note_proxy_1.default);
 // ── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
     res.status(404).json({ message: "Route not found." });

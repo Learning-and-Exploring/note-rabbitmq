@@ -1,5 +1,6 @@
 import { prisma } from "../../shared/database";
 import { Prisma } from "@prisma/client";
+import crypto from "crypto";
 import { CreateNoteDto } from "./note.model";
 
 export const noteService = {
@@ -71,6 +72,66 @@ export const noteService = {
       }
       throw err;
     }
+  },
+
+  async shareNoteById(id: string, authId: string) {
+    const note = await prisma.note.findFirst({
+      where: { id, authId },
+      select: { id: true },
+    });
+
+    if (!note) {
+      throw new Error("Note not found.");
+    }
+
+    const shareToken = crypto.randomBytes(24).toString("hex");
+    return prisma.note.update({
+      where: { id },
+      data: {
+        isPublic: true,
+        shareToken,
+      },
+    });
+  },
+
+  async unshareNoteById(id: string, authId: string) {
+    const note = await prisma.note.findFirst({
+      where: { id, authId },
+      select: { id: true },
+    });
+
+    if (!note) {
+      throw new Error("Note not found.");
+    }
+
+    return prisma.note.update({
+      where: { id },
+      data: {
+        isPublic: false,
+        shareToken: null,
+      },
+    });
+  },
+
+  async getPublicNoteByToken(shareToken: string) {
+    const note = await prisma.note.findFirst({
+      where: {
+        shareToken,
+        isPublic: true,
+      },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!note) {
+      throw new Error("Shared note not found.");
+    }
+
+    return note;
   },
 
 

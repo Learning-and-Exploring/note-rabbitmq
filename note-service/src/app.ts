@@ -1,5 +1,6 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import noteRoutes from "./modules/note/note.routes";
+import notePublicRoutes from "./modules/note/note.public.routes";
 
 const app: Application = express();
 
@@ -8,6 +9,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use("/notes", noteRoutes);
+app.use("/public/notes", notePublicRoutes);
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import LoginView from '@/features/auth/views/LoginView.vue'
 import NotesView from '@/features/notes/views/NotesView.vue'
+import PublicNoteView from '@/features/notes/views/PublicNoteView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -23,6 +24,11 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/shared/:token',
+      name: 'public-note',
+      component: PublicNoteView,
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: { name: 'notes' },
     },
@@ -30,6 +36,10 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  if (to.name === 'public-note') {
+    return true
+  }
+
   const { restoreSession, isAuthenticated } = useAuth()
   await restoreSession()
 

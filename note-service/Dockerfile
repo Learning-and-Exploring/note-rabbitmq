@@ -30,4 +30,4 @@ RUN npx prisma generate
 EXPOSE 3003
 
 # Sync schema then start the app (project currently has no prisma/migrations)
-CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss --skip-generate && node dist/server.js"]

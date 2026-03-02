@@ -25,22 +25,33 @@ const {
   status,
   selectedNoteId,
   deletingNoteId,
+  sharingNoteId,
   hasUnsavedChanges,
+  buildShareUrl,
   preview,
   resetEditor,
   loadNotes,
   selectNote,
   saveNote,
   deleteNote,
+  shareNote,
+  unshareNote,
   clearAll,
 } = useNotes()
 const deleteCandidate = ref(null)
 const unsavedModalOpen = ref(false)
 const pendingAction = ref(null)
+const shareModalOpen = ref(false)
+const shareModalCopied = ref(false)
 const editorRef = ref(null)
 const activeToolbar = ref({})
 const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
 const saveButtonLabel = computed(() => (selectedNoteId.value ? 'Update Note' : 'Save Note'))
+const selectedNote = computed(() => notes.value.find((note) => note.id === selectedNoteId.value) || null)
+const shareLink = computed(() => {
+  if (!selectedNote.value?.isPublic || !selectedNote.value?.shareToken) return ''
+  return buildShareUrl(selectedNote.value.shareToken)
+})
 const maskedEmail = computed(() => {
   const raw = String(props.email || '').trim()
   const at = raw.indexOf('@')
@@ -229,11 +240,46 @@ async function saveThenContinue() {
 async function discardThenContinue() {
   await proceedPendingAction()
 }
+
+function openShareModal() {
+  if (!selectedNote.value?.id) return
+  shareModalCopied.value = false
+  shareModalOpen.value = true
+}
+
+function closeShareModal() {
+  shareModalOpen.value = false
+  shareModalCopied.value = false
+}
+
+async function enableShareFromModal() {
+  if (!selectedNote.value?.id) return
+  await shareNote(selectedNote.value.id, props.authId)
+  shareModalCopied.value = false
+}
+
+async function disableShareFromModal() {
+  if (!selectedNote.value?.id) return
+  await unshareNote(selectedNote.value.id, props.authId)
+  shareModalCopied.value = false
+}
+
+async function copyShareLink() {
+  if (!shareLink.value) return
+  try {
+    await navigator.clipboard.writeText(shareLink.value)
+    shareModalCopied.value = true
+    status.value = 'Share link copied'
+  } catch {
+    shareModalCopied.value = false
+    status.value = 'Failed to copy share link'
+  }
+}
 </script>
 
 <template>
-  <main class="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-4 overflow-x-hidden p-5 lg:grid-cols-12">
-    <aside class="min-w-0 rounded-xl border border-neutral-200 bg-white p-4 lg:col-span-4">
+  <main class="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-5 overflow-x-hidden p-5 lg:grid-cols-12">
+    <aside class="min-w-0 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:col-span-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-base font-semibold text-neutral-900">Workspace</h2>
@@ -260,8 +306,8 @@ async function discardThenContinue() {
         <div
           v-for="note in notes"
           :key="note.id"
-          class="flex h-24 min-w-0 items-start gap-2 rounded-lg border p-2 transition-colors"
-          :class="note.id === selectedNoteId ? 'border-blue-400 bg-blue-50/40' : 'border-neutral-200 bg-white hover:bg-neutral-50'"
+          class="flex h-24 min-w-0 items-start gap-2 rounded-xl border p-2 transition-colors"
+          :class="note.id === selectedNoteId ? 'border-blue-400 bg-blue-50/50 shadow-sm' : 'border-neutral-200 bg-white hover:bg-neutral-50'"
         >
           <button
             class="flex h-full min-w-0 flex-1 flex-col justify-start overflow-hidden rounded-md px-1 py-0.5 text-left"
@@ -285,16 +331,16 @@ async function discardThenContinue() {
       </div>
     </aside>
 
-    <section class="min-w-0 flex h-[72vh] flex-col rounded-xl border border-neutral-200 bg-white lg:col-span-8">
-      <div class="border-b border-neutral-200 px-6 py-4">
+    <section class="min-w-0 flex h-[72vh] flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm lg:col-span-8">
+      <div class="border-b border-neutral-200 px-6 py-5">
         <p class="text-xs font-medium uppercase tracking-wide text-neutral-400">Editor</p>
         <input
           v-model="title"
-          class="mt-2 w-full border-0 p-0 text-3xl font-bold text-neutral-900 outline-none"
+          class="mt-2 w-full border-0 p-0 text-3xl font-bold text-neutral-900 outline-none placeholder:text-neutral-300"
           placeholder="Untitled"
         />
       </div>
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col px-6 py-4">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col px-6 py-5">
         <div class="group relative min-h-0 min-w-0 flex-1">
           <div class="pointer-events-none absolute right-0 top-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             <div class="pointer-events-auto flex flex-wrap gap-1 rounded-lg border border-neutral-200 bg-white/95 p-1 shadow-sm backdrop-blur">
@@ -314,7 +360,7 @@ async function discardThenContinue() {
 
           <div
             ref="editorRef"
-            class="editor-input min-h-0 min-w-0 h-full overflow-y-auto p-0 pr-1 text-base leading-8 text-neutral-800 outline-none focus:border-neutral-200"
+            class="editor-input min-h-0 min-w-0 h-full overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50/40 p-4 text-base leading-8 text-neutral-800 outline-none focus:border-neutral-300"
             contenteditable="true"
             data-placeholder="Write your ideas here..."
             @input="syncModelFromEditor(); updateToolbarState()"
@@ -326,7 +372,10 @@ async function discardThenContinue() {
       </div>
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-6 py-4">
         <span class="text-xs text-neutral-500">{{ status }}</span>
-        <BaseButton size="md" @click="saveNote(authId)">{{ saveButtonLabel }}</BaseButton>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <BaseButton variant="secondary" :disabled="!selectedNoteId" @click="openShareModal">Share</BaseButton>
+          <BaseButton size="md" @click="saveNote(authId)">{{ saveButtonLabel }}</BaseButton>
+        </div>
       </div>
     </section>
   </main>
@@ -365,6 +414,53 @@ async function discardThenContinue() {
         <BaseButton variant="secondary" @click="closeUnsavedModal">Cancel</BaseButton>
         <BaseButton variant="secondary" @click="discardThenContinue">Discard</BaseButton>
         <BaseButton @click="saveThenContinue">Save & Continue</BaseButton>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-if="shareModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeShareModal"
+  >
+    <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+      <h3 class="text-base font-semibold text-neutral-900">Share note</h3>
+      <p class="mt-2 text-sm text-neutral-600">
+        {{ selectedNote?.isPublic ? 'Anyone with this link can view the note.' : 'Create a public link to share this note.' }}
+      </p>
+
+      <div class="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+        <p class="truncate text-sm font-medium text-neutral-800">{{ selectedNote?.title || 'Untitled Note' }}</p>
+        <p v-if="shareLink" class="mt-2 break-all text-xs font-medium text-blue-700">{{ shareLink }}</p>
+        <p v-else class="mt-2 text-xs text-neutral-500">No share link created yet.</p>
+      </div>
+
+      <p v-if="shareModalCopied" class="mt-3 text-xs font-medium text-emerald-600">Copied to clipboard</p>
+
+      <div class="mt-5 flex flex-wrap justify-end gap-2">
+        <BaseButton variant="secondary" @click="closeShareModal">Close</BaseButton>
+        <BaseButton
+          v-if="selectedNote?.isPublic"
+          variant="secondary"
+          :disabled="sharingNoteId === selectedNoteId"
+          @click="disableShareFromModal"
+        >
+          {{ sharingNoteId === selectedNoteId ? 'Working...' : 'Disable Share' }}
+        </BaseButton>
+        <BaseButton
+          v-if="selectedNote?.isPublic"
+          :disabled="!shareLink"
+          @click="copyShareLink"
+        >
+          Copy Link
+        </BaseButton>
+        <BaseButton
+          v-else
+          :disabled="sharingNoteId === selectedNoteId"
+          @click="enableShareFromModal"
+        >
+          {{ sharingNoteId === selectedNoteId ? 'Creating...' : 'Create Link' }}
+        </BaseButton>
       </div>
     </div>
   </div>

@@ -8,6 +8,7 @@ export function useNotes() {
   const status = ref('Ready')
   const selectedNoteId = ref('')
   const deletingNoteId = ref('')
+  const sharingNoteId = ref('')
   const savedTitle = ref('')
   const savedContent = ref('')
   const { getAccessToken, expireSession } = useAuth()
@@ -217,6 +218,97 @@ export function useNotes() {
     }
   }
 
+  function buildShareUrl(token) {
+    if (!token) return ''
+    return `${window.location.origin}/shared/${token}`
+  }
+
+  async function shareNote(id, authId) {
+    if (!id) {
+      status.value = 'Missing note id'
+      return ''
+    }
+    if (!authId?.trim()) {
+      status.value = 'Missing authId'
+      return ''
+    }
+
+    sharingNoteId.value = id
+    status.value = 'Creating share link...'
+    try {
+      const res = await fetch(`/api/notes/${encodeURIComponent(id)}/share`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ authId: authId.trim() }),
+      })
+
+      const payload = await res.json()
+      if (res.status === 401) {
+        handleUnauthorized(payload)
+        return ''
+      }
+      if (!res.ok) {
+        status.value = payload.message || 'Share failed'
+        return ''
+      }
+
+      status.value = 'Share link ready'
+      if (authId?.trim()) {
+        await loadNotes(authId)
+      }
+      return buildShareUrl(payload?.data?.shareToken)
+    } catch (err) {
+      console.error(err)
+      status.value = 'Share failed'
+      return ''
+    } finally {
+      sharingNoteId.value = ''
+    }
+  }
+
+  async function unshareNote(id, authId) {
+    if (!id) {
+      status.value = 'Missing note id'
+      return false
+    }
+    if (!authId?.trim()) {
+      status.value = 'Missing authId'
+      return false
+    }
+
+    sharingNoteId.value = id
+    status.value = 'Disabling share...'
+    try {
+      const res = await fetch(`/api/notes/${encodeURIComponent(id)}/share`, {
+        method: 'DELETE',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ authId: authId.trim() }),
+      })
+
+      const payload = await res.json()
+      if (res.status === 401) {
+        handleUnauthorized(payload)
+        return false
+      }
+      if (!res.ok) {
+        status.value = payload.message || 'Disable share failed'
+        return false
+      }
+
+      status.value = 'Share disabled'
+      if (authId?.trim()) {
+        await loadNotes(authId)
+      }
+      return true
+    } catch (err) {
+      console.error(err)
+      status.value = 'Disable share failed'
+      return false
+    } finally {
+      sharingNoteId.value = ''
+    }
+  }
+
   function clearAll() {
     notes.value = []
     selectedNoteId.value = ''
@@ -233,13 +325,17 @@ export function useNotes() {
     status,
     selectedNoteId,
     deletingNoteId,
+    sharingNoteId,
     hasUnsavedChanges,
+    buildShareUrl,
     preview,
     resetEditor,
     loadNotes,
     selectNote,
     saveNote,
     deleteNote,
+    shareNote,
+    unshareNote,
     clearAll,
   }
 }
