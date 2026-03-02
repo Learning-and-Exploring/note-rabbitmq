@@ -23,7 +23,6 @@ router.get("/:id", noteController.getNoteById);
 
 // PATCH /notes/:id           — update a single note
 router.patch("/:id", noteController.updateNoteById);
-router.put("/:id", noteController.updateNoteById);
 
 // Delete /notes/:id
 router.delete("/:id", noteController.deleteNoteById);
