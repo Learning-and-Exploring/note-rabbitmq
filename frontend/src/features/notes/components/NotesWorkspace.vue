@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 import { useNotes } from '@/features/notes/composables/useNotes'
 
@@ -34,6 +34,7 @@ const {
   clearAll,
 } = useNotes()
 const deleteCandidate = ref(null)
+const editorRef = ref(null)
 const noteCountLabel = computed(() => `${notes.value.length} note${notes.value.length === 1 ? '' : 's'}`)
 const saveButtonLabel = computed(() => (selectedNoteId.value ? 'Update Note' : 'Save Note'))
 const maskedEmail = computed(() => {
@@ -45,6 +46,55 @@ const maskedEmail = computed(() => {
   const visible = name.slice(0, Math.min(3, name.length))
   return `${visible}***@${domain}`
 })
+const toolbarActions = [
+  { key: 'bold', label: 'B', title: 'Bold' },
+  { key: 'italic', label: 'I', title: 'Italic' },
+  { key: 'underline', label: 'U', title: 'Underline' },
+  { key: 'insertUnorderedList', label: '• List', title: 'Bulleted list' },
+  { key: 'insertOrderedList', label: '1. List', title: 'Numbered list' },
+  { key: 'formatBlock:h2', label: 'H2', title: 'Heading' },
+  { key: 'formatBlock:blockquote', label: 'Quote', title: 'Quote' },
+]
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function toEditorHtml(raw) {
+  if (!raw) return ''
+  const text = String(raw)
+  const looksLikeHtml = /<[^>]+>/.test(text)
+  if (looksLikeHtml) return text
+  return escapeHtml(text).replace(/\n/g, '<br>')
+}
+
+function syncEditorFromModel() {
+  if (!editorRef.value) return
+  const html = toEditorHtml(content.value)
+  if (editorRef.value.innerHTML !== html) {
+    editorRef.value.innerHTML = html
+  }
+}
+
+function syncModelFromEditor() {
+  if (!editorRef.value) return
+  content.value = editorRef.value.innerHTML
+}
+
+function runCommand(actionKey) {
+  if (!editorRef.value) return
+  editorRef.value.focus()
+  if (actionKey.startsWith('formatBlock:')) {
+    const block = actionKey.split(':')[1]
+    document.execCommand('formatBlock', false, block)
+  } else {
+    document.execCommand(actionKey, false)
+  }
+  syncModelFromEditor()
+}
 
 watch(
   () => props.authId,
@@ -59,7 +109,17 @@ onMounted(() => {
   if (props.authId) {
     loadNotes(props.authId)
   }
+  syncEditorFromModel()
 })
+
+watch(
+  () => content.value,
+  () => {
+    nextTick(() => {
+      syncEditorFromModel()
+    })
+  },
+)
 
 function openDeleteModal(note) {
   deleteCandidate.value = note
@@ -141,11 +201,30 @@ async function confirmDelete() {
         />
       </div>
       <div class="flex min-h-0 min-w-0 flex-1 flex-col px-6 py-4">
-        <textarea
-          v-model="content"
-          class="min-h-0 min-w-0 flex-1 resize-none overflow-y-auto border-0 p-0 text-base leading-8 text-neutral-800 outline-none"
-          placeholder="Write your ideas here..."
-        />
+        <div class="group relative min-h-0 min-w-0 flex-1">
+          <div class="pointer-events-none absolute right-0 top-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div class="pointer-events-auto flex flex-wrap gap-1 rounded-lg border border-neutral-200 bg-white/95 p-1 shadow-sm backdrop-blur">
+              <button
+                v-for="action in toolbarActions"
+                :key="action.key"
+                type="button"
+                class="rounded-md border border-neutral-200 px-2 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                :title="action.title"
+                @click="runCommand(action.key)"
+              >
+                {{ action.label }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            ref="editorRef"
+            class="editor-input min-h-0 min-w-0 h-full overflow-y-auto p-0 pr-1 text-base leading-8 text-neutral-800 outline-none focus:border-neutral-200"
+            contenteditable="true"
+            data-placeholder="Write your ideas here..."
+            @input="syncModelFromEditor"
+          />
+        </div>
       </div>
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-6 py-4">
         <span class="text-xs text-neutral-500">{{ status }}</span>
@@ -174,3 +253,29 @@ async function confirmDelete() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.editor-input:empty:before {
+  content: attr(data-placeholder);
+  color: #a3a3a3;
+}
+
+.editor-input :deep(h1),
+.editor-input :deep(h2),
+.editor-input :deep(h3) {
+  font-weight: 700;
+  margin: 0.5rem 0;
+}
+
+.editor-input :deep(blockquote) {
+  border-left: 3px solid #d4d4d4;
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  color: #525252;
+}
+
+.editor-input :deep(ul),
+.editor-input :deep(ol) {
+  margin: 0.5rem 0 0.5rem 1.2rem;
+}
+</style>

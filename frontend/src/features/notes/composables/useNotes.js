@@ -33,7 +33,15 @@ export function useNotes() {
 
   function preview(value) {
     if (!value) return 'No content'
-    const compact = value.replace(/\s+/g, ' ').trim()
+    const plain = String(value)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const compact = plain || 'No content'
     if (compact.length <= 70) return compact
     return `${compact.slice(0, 70)}...`
   }

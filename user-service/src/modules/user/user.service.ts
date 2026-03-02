@@ -146,4 +146,8 @@ export const userService = {
 
     return user;
   },
+
+  async deleteUser(id: string) {
+    await prisma.user.delete({ where: { id } });
+  },
 };

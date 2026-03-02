@@ -36,4 +36,24 @@ export const userController = {
       }
     }
   },
+
+  /**
+   * DELETE /users/:id
+   * Delete a single user by ID.
+   */
+  async deleteUser(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await userService.deleteUser(id as string);
+      res.status(204).end();
+    }catch (error: any) {
+      if (error.message === "User not found.") {
+        res.status(404).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: error.message });
+      }
+    }
+  }
 };
