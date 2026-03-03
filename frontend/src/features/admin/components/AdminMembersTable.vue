@@ -1,5 +1,12 @@
 <script setup>
 import BaseButton from '@/shared/components/base/BaseButton.vue'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 defineProps({
   limit: {
@@ -74,6 +81,13 @@ const emit = defineEmits([
   'prev-page',
   'next-page',
 ])
+
+function handleLimitUpdate(value) {
+  const next = Number(value)
+  if (!Number.isFinite(next)) return
+  emit('update:limit', next)
+  emit('limit-change')
+}
 </script>
 
 <template>
@@ -82,17 +96,17 @@ const emit = defineEmits([
       <div class="flex flex-wrap items-center gap-2">
         <label class="inline-flex items-center gap-2 text-sm text-slate-600">
           Per page
-          <select
-            :value="limit"
-            class="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
-            :disabled="loadingUsers"
-            @change="emit('update:limit', Number($event.target.value)); emit('limit-change')"
-          >
-            <option :value="5">5</option>
-            <option :value="10">10</option>
-            <option :value="20">20</option>
-            <option :value="50">50</option>
-          </select>
+          <Select :model-value="String(limit)" :disabled="loadingUsers" @update:model-value="handleLimitUpdate">
+            <SelectTrigger class="h-8 w-[84px] border-slate-200 bg-white text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <BaseButton variant="secondary" :disabled="loadingUsers" @click="emit('reload')">Reload</BaseButton>
         <BaseButton @click="emit('add-member')">Add Member</BaseButton>

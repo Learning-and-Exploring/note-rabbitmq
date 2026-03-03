@@ -1,6 +1,13 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 import BaseModalDialog from '@/shared/components/base/BaseModalDialog.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
@@ -628,17 +635,21 @@ onMounted(async () => {
             <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
               <label class="inline-flex items-center gap-2 text-sm text-slate-600">
                 Per page
-                <select
-                  v-model.number="limit"
-                  class="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+                <Select
+                  :model-value="String(limit)"
                   :disabled="loadingUsers"
-                  @change="onLimitChange"
+                  @update:model-value="(value) => { limit = Number(value); onLimitChange() }"
                 >
-                  <option :value="5">5</option>
-                  <option :value="10">10</option>
-                  <option :value="20">20</option>
-                  <option :value="50">50</option>
-                </select>
+                  <SelectTrigger class="h-8 w-[84px] border-slate-200 bg-white text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
               <p class="text-sm text-slate-500">{{ membersStatus }}</p>
             </div>
@@ -851,14 +862,15 @@ onMounted(async () => {
       </label>
       <label class="text-sm font-semibold text-neutral-700">
         Role
-        <select
-          v-model="createMemberForm.role"
-          class="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800"
-          :disabled="creatingMember"
-        >
-          <option value="USER">Member</option>
-          <option value="ADMIN">Admin</option>
-        </select>
+        <Select v-model="createMemberForm.role" :disabled="creatingMember">
+          <SelectTrigger class="mt-1 w-full border-neutral-200 text-sm text-neutral-800">
+            <SelectValue placeholder="Select role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="USER">Member</SelectItem>
+            <SelectItem value="ADMIN">Admin</SelectItem>
+          </SelectContent>
+        </Select>
       </label>
     </div>
 
