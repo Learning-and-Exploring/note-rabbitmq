@@ -3,6 +3,7 @@ export const AUTH_EVENTS = {
   CREATED: "auth.created",
   UPDATED: "auth.updated",
   EMAIL_VERIFIED: "auth.email_verified",
+  EMAIL_UNVERIFIED: "auth.email_unverified",
 } as const;
 
 export type AuthEventName = (typeof AUTH_EVENTS)[keyof typeof AUTH_EVENTS];
@@ -30,8 +31,15 @@ export interface AuthEmailVerifiedPayload {
   verifiedAt: string; // ISO 8601
 }
 
+export interface AuthEmailUnverifiedPayload {
+  id: string;
+  email: string;
+  unverifiedAt: string; // ISO 8601
+}
+
 // Union type useful for typed consumers
 export type AuthEventPayload =
   | AuthCreatedPayload
   | AuthUpdatedPayload
-  | AuthEmailVerifiedPayload;
+  | AuthEmailVerifiedPayload
+  | AuthEmailUnverifiedPayload;

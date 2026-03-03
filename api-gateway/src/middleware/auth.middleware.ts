@@ -29,6 +29,14 @@ function isAdminOnlyRoute(req: Request): boolean {
     return true;
   }
 
+  if (req.method === "PATCH" && /^\/auths\/[^/]+\/verify-email$/.test(path)) {
+    return true;
+  }
+
+  if (req.method === "PATCH" && /^\/auths\/[^/]+\/email-verification$/.test(path)) {
+    return true;
+  }
+
   return false;
 }
 

@@ -85,6 +85,7 @@ export const userController = {
     try {
       const user = await userService.createUserByAdmin({
         email: req.body?.email,
+        password: req.body?.password,
         name: req.body?.name,
         role: req.body?.role,
       });
@@ -93,6 +94,9 @@ export const userController = {
     } catch (error: any) {
       if (
         error.message === "Valid email is required." ||
+        error.message === "Password is required." ||
+        error.message === "Password must be at least 8 characters." ||
+        error.message === "Unable to create auth account." ||
         error.message === "A user with this email already exists."
       ) {
         res.status(400).json({ message: error.message });

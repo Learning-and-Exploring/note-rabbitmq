@@ -17,6 +17,7 @@ export interface GetUserDto {
 
 export interface AdminCreateUserDto {
   email: string;
+  password: string;
   name?: string;
   role?: UserRole;
 }

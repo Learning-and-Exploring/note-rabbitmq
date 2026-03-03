@@ -12,6 +12,7 @@ import {
 } from "./auth.model";
 import {
   publishAuthCreated,
+  publishAuthEmailUnverified,
   publishAuthEmailVerified,
 } from "../../events/publishers/auth.publisher";
 import {
@@ -240,6 +241,132 @@ export const authService = {
     });
 
     return updated;
+  },
+
+  /**
+   * Admin action: force-verify an auth email by auth ID.
+   * Emits auth.email_verified only when transitioning from unverified -> verified.
+   */
+  async adminVerifyEmailById(id: string) {
+    const auth = await prisma.auth.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (!auth) {
+      throw new Error("Auth not found.");
+    }
+
+    if (auth.emailVerifiedAt) {
+      return {
+        id: auth.id,
+        email: auth.email,
+        emailVerifiedAt: auth.emailVerifiedAt,
+        alreadyVerified: true,
+      };
+    }
+
+    const verifiedAt = new Date();
+    const updated = await prisma.auth.update({
+      where: { id: auth.id },
+      data: {
+        emailVerifiedAt: verifiedAt,
+        emailVerificationOtpHash: null,
+        emailVerificationOtpExpiresAt: null,
+        emailVerificationOtpAttempts: 0,
+        emailVerificationOtpSentAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    publishAuthEmailVerified({
+      id: updated.id,
+      email: updated.email,
+      verifiedAt: updated.emailVerifiedAt!.toISOString(),
+    });
+
+    return {
+      ...updated,
+      alreadyVerified: false,
+    };
+  },
+
+  /**
+   * Admin action: set email verification state explicitly.
+   * When set to false, emits auth.email_unverified.
+   * When set to true, emits auth.email_verified if transitioning from unverified.
+   */
+  async adminSetEmailVerificationById(id: string, isEmailVerified: boolean) {
+    const auth = await prisma.auth.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (!auth) {
+      throw new Error("Auth not found.");
+    }
+
+    const currentlyVerified = Boolean(auth.emailVerifiedAt);
+    if (currentlyVerified === isEmailVerified) {
+      return {
+        id: auth.id,
+        email: auth.email,
+        isEmailVerified,
+        emailVerifiedAt: auth.emailVerifiedAt,
+        changed: false,
+      };
+    }
+
+    const now = new Date();
+    const updated = await prisma.auth.update({
+      where: { id: auth.id },
+      data: {
+        emailVerifiedAt: isEmailVerified ? now : null,
+        emailVerificationOtpHash: null,
+        emailVerificationOtpExpiresAt: null,
+        emailVerificationOtpAttempts: 0,
+        emailVerificationOtpSentAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (isEmailVerified) {
+      publishAuthEmailVerified({
+        id: updated.id,
+        email: updated.email,
+        verifiedAt: updated.emailVerifiedAt!.toISOString(),
+      });
+    } else {
+      publishAuthEmailUnverified({
+        id: updated.id,
+        email: updated.email,
+        unverifiedAt: now.toISOString(),
+      });
+    }
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      isEmailVerified,
+      emailVerifiedAt: updated.emailVerifiedAt,
+      changed: true,
+    };
   },
 
   /**

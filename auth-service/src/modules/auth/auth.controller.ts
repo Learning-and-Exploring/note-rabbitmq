@@ -54,14 +54,14 @@ export const authController = {
    */
   async createAuth(req: Request, res: Response) {
     try {
-      const { email, password, name } = req.body;
+      const { email, password, name, role } = req.body;
 
       if (!email || !password) {
         res.status(400).json({ message: "email and password are required." });
         return;
       }
 
-      const auth = await authService.createAuth({ email, password, name });
+      const auth = await authService.createAuth({ email, password, name, role });
       res
         .status(201)
         .json({ message: "Auth created successfully.", data: auth });
@@ -300,6 +300,69 @@ export const authController = {
         res.status(429).json({ message: error.message });
       } else if (error.message === "Email is already verified.") {
         res.status(409).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: error.message });
+      }
+    }
+  },
+
+  /**
+   * PATCH /auths/:id/verify-email
+   * Admin endpoint to force-verify email.
+   */
+  async adminVerifyEmailById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const result = await authService.adminVerifyEmailById(id as string);
+
+      res.status(200).json({
+        message: result.alreadyVerified
+          ? "Email is already verified."
+          : "Email verified successfully by admin.",
+        data: result,
+      });
+    } catch (error: any) {
+      if (error.message === "Auth not found.") {
+        res.status(404).json({ message: error.message });
+      } else {
+        res
+          .status(500)
+          .json({ message: "Internal server error.", detail: error.message });
+      }
+    }
+  },
+
+  /**
+   * PATCH /auths/:id/email-verification
+   * Admin endpoint to set email verification true/false.
+   * Body: { isEmailVerified: boolean }
+   */
+  async adminSetEmailVerificationById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { isEmailVerified } = req.body ?? {};
+
+      if (typeof isEmailVerified !== "boolean") {
+        res.status(400).json({ message: "isEmailVerified (boolean) is required." });
+        return;
+      }
+
+      const result = await authService.adminSetEmailVerificationById(
+        id as string,
+        isEmailVerified,
+      );
+
+      res.status(200).json({
+        message: result.changed
+          ? `Email verification set to ${isEmailVerified}.`
+          : "Email verification state unchanged.",
+        data: result,
+      });
+    } catch (error: any) {
+      if (error.message === "Auth not found.") {
+        res.status(404).json({ message: error.message });
       } else {
         res
           .status(500)

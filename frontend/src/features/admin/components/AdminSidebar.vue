@@ -32,7 +32,7 @@ function selectTab(tab) {
     <nav class="mt-8 space-y-1">
       <button
         type="button"
-        class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium"
+        class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium cursor-pointer"
         :class="navActive === 'overview' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'"
         @click="selectTab('overview')"
       >

@@ -1,5 +1,4 @@
 import { prisma } from "../../shared/database";
-import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { promises as fs } from "fs";
 import path from "path";
@@ -12,6 +11,7 @@ import {
   publishUserCreated,
   publishUserEmailVerified,
 } from "../../events/publishers/user.publisher";
+import { env } from "../../config/env";
 
 const defaultWorkspaceSettings: WorkspaceSettingsDto = {
   name: "",
@@ -155,6 +155,42 @@ export const userService = {
   },
 
   /**
+   * Sync email unverified status from auth.email_unverified payload.
+   */
+  async syncEmailUnverifiedFromAuth(data: {
+    id: string;
+    email: string;
+  }) {
+    const user = await prisma.user.upsert({
+      where: { id: data.id },
+      update: {
+        email: data.email,
+        isEmailVerified: false,
+        emailVerifiedAt: null,
+      },
+      create: {
+        id: data.id,
+        email: data.email,
+        isEmailVerified: false,
+        emailVerifiedAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        avatarUrl: true,
+        isEmailVerified: true,
+        emailVerifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return user;
+  },
+
+  /**
    * Return all users (safe fields only).
    */
   async getAllUsers(input: { page: number; limit: number; skip: number }) {
@@ -223,11 +259,18 @@ export const userService = {
 
   async createUserByAdmin(dto: AdminCreateUserDto) {
     const email = String(dto.email || "").trim().toLowerCase();
+    const password = String(dto.password || "").trim();
     const name = String(dto.name || "").trim() || null;
     const role = dto.role === "ADMIN" ? "ADMIN" : "USER";
 
     if (!email || !email.includes("@")) {
       throw new Error("Valid email is required.");
+    }
+    if (!password) {
+      throw new Error("Password is required.");
+    }
+    if (password.length < 8) {
+      throw new Error("Password must be at least 8 characters.");
     }
 
     const existing = await prisma.user.findUnique({
@@ -239,15 +282,80 @@ export const userService = {
       throw new Error("A user with this email already exists.");
     }
 
-    let user;
+    const authServiceBaseUrl = env.AUTH_SERVICE_URL.replace(/\/+$/, "");
+    let createdAuth: any = null;
+
     try {
-      user = await prisma.user.create({
-        data: {
-          id: randomUUID(),
+      const authRes = await fetch(`${authServiceBaseUrl}/auths`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          name: name || undefined,
+          role,
+        }),
+      });
+
+      const authPayloadRaw: unknown = await authRes.json().catch(() => ({}));
+      const authPayload = (
+        authPayloadRaw && typeof authPayloadRaw === "object"
+          ? authPayloadRaw
+          : {}
+      ) as { message?: string; data?: unknown };
+      if (!authRes.ok) {
+        const message = String(authPayload?.message || "").trim();
+        if (message === "A auth with that email already exists.") {
+          throw new Error("A user with this email already exists.");
+        }
+        throw new Error(message || "Unable to create auth account.");
+      }
+
+      createdAuth = authPayload?.data || null;
+    } catch (error: any) {
+      if (
+        error instanceof Error &&
+        (error.message === "A user with this email already exists." ||
+          error.message === "Unable to create auth account.")
+      ) {
+        throw error;
+      }
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Unable to create auth account.";
+      throw new Error(message);
+    }
+
+    const authId = String(createdAuth?.id || "").trim();
+    if (!authId) {
+      throw new Error("Unable to create auth account.");
+    }
+
+    const isEmailVerified = Boolean(createdAuth?.emailVerifiedAt);
+    const emailVerifiedAt = createdAuth?.emailVerifiedAt
+      ? new Date(createdAuth.emailVerifiedAt)
+      : null;
+
+    try {
+      const user = await prisma.user.upsert({
+        where: { id: authId },
+        update: {
           email,
           name,
           role,
-          isEmailVerified: false,
+          isEmailVerified,
+          emailVerifiedAt,
+        },
+        create: {
+          id: authId,
+          email,
+          name,
+          role,
+          isEmailVerified,
+          emailVerifiedAt,
         },
         select: {
           id: true,
@@ -261,6 +369,8 @@ export const userService = {
           updatedAt: true,
         },
       });
+
+      return user;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -270,8 +380,6 @@ export const userService = {
       }
       throw error;
     }
-
-    return user;
   },
 
   async getWorkspaceSettings() {

@@ -34,6 +34,7 @@ const workspaceStatus = ref('')
 
 const deletingUserId = ref('')
 const pendingDeleteUser = ref(null)
+const verifyingUserId = ref('')
 
 const viewingUserId = ref('')
 const detailLoading = ref(false)
@@ -45,6 +46,7 @@ const creatingMember = ref(false)
 const createMemberForm = ref({
   name: '',
   email: '',
+  password: '',
   role: 'USER',
 })
 
@@ -270,7 +272,7 @@ function selectTab(tab) {
 }
 
 function openCreateMemberModal() {
-  createMemberForm.value = { name: '', email: '', role: 'USER' }
+  createMemberForm.value = { name: '', email: '', password: '', role: 'USER' }
   createMemberOpen.value = true
 }
 
@@ -281,11 +283,16 @@ function closeCreateMemberModal() {
 
 async function createMember() {
   const email = createMemberForm.value.email.trim().toLowerCase()
+  const password = createMemberForm.value.password
   const name = createMemberForm.value.name.trim()
   const role = createMemberForm.value.role === 'ADMIN' ? 'ADMIN' : 'USER'
 
   if (!email || !email.includes('@')) {
     membersStatus.value = 'Please enter a valid member email'
+    return
+  }
+  if (!password || password.length < 8) {
+    membersStatus.value = 'Password must be at least 8 characters'
     return
   }
 
@@ -296,7 +303,7 @@ async function createMember() {
     const res = await fetch('/api/users', {
       method: 'POST',
       headers: authHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ email, name: name || undefined, role }),
+      body: JSON.stringify({ email, password, name: name || undefined, role }),
     })
 
     const payload = await res.json().catch(() => ({}))
@@ -361,6 +368,58 @@ async function confirmDeleteUser() {
     membersStatus.value = 'Failed to delete user'
   } finally {
     deletingUserId.value = ''
+  }
+}
+
+async function verifyUserEmail(user) {
+  const userId = user?.id
+  if (!userId) return
+  if (user?.isEmailVerified) {
+    membersStatus.value = 'Email is already verified'
+    return
+  }
+
+  verifyingUserId.value = userId
+  membersStatus.value = 'Verifying user email...'
+
+  try {
+    const res = await fetch(`/auth-api/auths/${userId}/verify-email`, {
+      method: 'PATCH',
+      headers: authHeader(),
+    })
+
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      membersStatus.value = payload.message || 'Failed to verify email'
+      return
+    }
+
+    users.value = users.value.map((row) => {
+      if (row?.id !== userId) return row
+      return {
+        ...row,
+        isEmailVerified: true,
+        emailVerifiedAt: payload?.data?.verifiedAt || row?.emailVerifiedAt || new Date().toISOString(),
+      }
+    })
+
+    if (selectedUserDetail.value?.id === userId) {
+      selectedUserDetail.value = {
+        ...selectedUserDetail.value,
+        isEmailVerified: true,
+        emailVerifiedAt:
+          payload?.data?.verifiedAt ||
+          selectedUserDetail.value?.emailVerifiedAt ||
+          new Date().toISOString(),
+      }
+    }
+
+    const targetEmail = user?.email || 'user'
+    membersStatus.value = payload.message || `Email verified for ${targetEmail}`
+  } catch {
+    membersStatus.value = 'Failed to verify email'
+  } finally {
+    verifyingUserId.value = ''
   }
 }
 
@@ -614,6 +673,14 @@ onMounted(async () => {
                     <td class="px-5 py-3">
                       <div class="flex justify-end gap-2">
                         <BaseButton
+                          v-if="!user.isEmailVerified"
+                          variant="secondary"
+                          :disabled="verifyingUserId === user.id"
+                          @click="verifyUserEmail(user)"
+                        >
+                          {{ verifyingUserId === user.id ? 'Verifying...' : 'Verify' }}
+                        </BaseButton>
+                        <BaseButton
                           variant="secondary"
                           :disabled="detailLoading && viewingUserId === user.id"
                           @click="openDetailsDialog(user)"
@@ -733,6 +800,13 @@ onMounted(async () => {
     </div>
 
     <template #actions>
+      <BaseButton
+        v-if="selectedUserDetail && !selectedUserDetail.isEmailVerified"
+        :disabled="detailLoading || verifyingUserId === selectedUserDetail.id"
+        @click="verifyUserEmail(selectedUserDetail)"
+      >
+        {{ verifyingUserId === selectedUserDetail?.id ? 'Verifying...' : 'Verify Email' }}
+      </BaseButton>
       <BaseButton variant="secondary" :disabled="detailLoading" @click="closeDetailsDialog">Close</BaseButton>
     </template>
   </BaseModalDialog>
@@ -762,6 +836,16 @@ onMounted(async () => {
           type="email"
           class="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800"
           placeholder="jane@example.com"
+          :disabled="creatingMember"
+        />
+      </label>
+      <label class="text-sm font-semibold text-neutral-700">
+        Password
+        <input
+          v-model="createMemberForm.password"
+          type="password"
+          class="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800"
+          placeholder="Minimum 8 characters"
           :disabled="creatingMember"
         />
       </label>

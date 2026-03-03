@@ -3,6 +3,7 @@ import { getChannel, QUEUE_NAME } from "../../config/rabbitmq";
 import { logger } from "../../shared/logger";
 import {
   handleAuthCreated,
+  handleAuthEmailUnverified,
   handleAuthEmailVerified,
 } from "../handlers/auth.event.handler";
 
@@ -24,6 +25,9 @@ export async function startAuthConsumer(): Promise<void> {
           break;
         case "auth.email_verified":
           await handleAuthEmailVerified(payload);
+          break;
+        case "auth.email_unverified":
+          await handleAuthEmailUnverified(payload);
           break;
         default:
           logger.warn(`[Consumer] Unhandled routing key: "${routingKey}"`);
