@@ -26,9 +26,9 @@ graph LR
   U[User Service :3002]
   N[Note Service :3003]
 
-  ADB[(auth_service_db :5433)]
-  UDB[(user_service_db :5435)]
-  NDB[(note_service_db :5434)]
+  ADB[(auth_service_db)]
+  UDB[(user_service_db)]
+  NDB[(note_service_db)]
 
   AX{{auth.events}}
   UX{{user.events}}
@@ -118,9 +118,7 @@ Notes:
 | Note Service   | `note-service` | `3003` | `3003` |
 | RabbitMQ AMQP  | `rabbitmq` | `5672` | `5672` |
 | RabbitMQ UI    | `rabbitmq` | `15672` | `15672` |
-| Auth DB        | `auth-db` | `5433` | `5432` |
-| Note DB        | `note-db` | `5434` | `5432` |
-| User DB        | `user-db` | `5435` | `5432` |
+| PostgreSQL DBs | `postgres-db` | `5433` | `5432` |
 
 ## API Endpoints (Current)
 

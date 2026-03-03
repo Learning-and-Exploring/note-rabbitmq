@@ -24,6 +24,12 @@ router.post("/verify-email", authController.verifyEmail);
 // POST /auths/resend-otp — resend email verification OTP
 router.post("/resend-otp", authController.resendVerificationOtp);
 
+// PATCH /auths/:id/verify-email — admin force-verifies email
+router.patch("/:id/verify-email", authController.adminVerifyEmailById);
+
+// PATCH /auths/:id/email-verification — admin sets verify true/false
+router.patch("/:id/email-verification", authController.adminSetEmailVerificationById);
+
 // GET /auths/:id — get a single auth by ID
 router.get("/:id", authController.getAuthById);
 

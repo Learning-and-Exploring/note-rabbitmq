@@ -1,14 +1,19 @@
 <script setup>
 import { computed, onMounted } from 'vue'
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 
 const { isAuthenticated, isAdmin, restoreSession, logout } = useAuth()
 const router = useRouter()
+const route = useRoute()
 const homeRoute = computed(() => {
   if (!isAuthenticated.value) return '/login'
   return isAdmin.value ? '/admin/users' : '/notes'
+})
+const showTopbar = computed(() => {
+  if (!isAuthenticated.value) return false
+  return !route.path.startsWith('/admin/')
 })
 
 onMounted(() => {
@@ -23,7 +28,7 @@ async function handleLogout() {
 
 <template>
   <div class="page">
-    <header class="topbar">
+    <header v-if="showTopbar" class="topbar">
       <h1>
         <RouterLink class="brand-link" :to="homeRoute">Notes</RouterLink>
       </h1>

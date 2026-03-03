@@ -14,3 +14,15 @@ export interface GetUserDto {
   id?: string;
   email?: string;
 }
+
+export interface AdminCreateUserDto {
+  email: string;
+  password: string;
+  name?: string;
+  role?: UserRole;
+}
+
+export interface WorkspaceSettingsDto {
+  name: string;
+  updatedAt: string;
+}

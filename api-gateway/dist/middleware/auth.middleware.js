@@ -32,6 +32,12 @@ function isAdminOnlyRoute(req) {
     if (req.method === "GET" && path === "/auths") {
         return true;
     }
+    if (req.method === "PATCH" && /^\/auths\/[^/]+\/verify-email$/.test(path)) {
+        return true;
+    }
+    if (req.method === "PATCH" && /^\/auths\/[^/]+\/email-verification$/.test(path)) {
+        return true;
+    }
     return false;
 }
 function getAuthIdParam(path) {

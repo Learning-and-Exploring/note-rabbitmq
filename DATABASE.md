@@ -93,6 +93,4 @@ erDiagram
 
 | Service DB | Container | Host Port | DB Name |
 | --- | --- | --- | --- |
-| Auth DB | `auth-db` | `5433` | `auth_service_db` |
-| Note DB | `note-db` | `5434` | `note_service_db` |
-| User DB | `user-db` | `5435` | `user_service_db` |
+| Shared Postgres | `postgres-db` | `5433` | `auth_service_db`, `note_service_db`, `user_service_db` |

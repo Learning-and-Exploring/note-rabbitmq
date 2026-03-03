@@ -15,6 +15,11 @@ interface AuthEmailVerifiedPayload {
   verifiedAt: string;
 }
 
+interface AuthEmailUnverifiedPayload {
+  id: string;
+  email: string;
+}
+
 export async function handleAuthCreated(
   payload: AuthCreatedPayload,
 ): Promise<void> {
@@ -39,5 +44,18 @@ export async function handleAuthEmailVerified(
     id: payload.id,
     email: payload.email,
     verifiedAt: payload.verifiedAt,
+  });
+}
+
+export async function handleAuthEmailUnverified(
+  payload: AuthEmailUnverifiedPayload,
+): Promise<void> {
+  logger.info(
+    `[EventHandler] Handling auth.email_unverified for auth ${payload.id}`,
+  );
+
+  await userService.syncEmailUnverifiedFromAuth({
+    id: payload.id,
+    email: payload.email,
   });
 }
