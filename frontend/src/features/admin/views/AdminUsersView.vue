@@ -6,47 +6,116 @@ import BaseModalDialog from '@/shared/components/base/BaseModalDialog.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
 
 const router = useRouter()
-const { currentUser, isAuthenticated, isAdmin, restoreSession, getAccessToken } = useAuth()
+const { currentUser, isAuthenticated, isAdmin, restoreSession, getAccessToken, logout } = useAuth()
+
+const navActive = ref('overview')
+const searchQuery = ref('')
 
 const users = ref([])
-const loading = ref(false)
-const status = ref('')
+const loadingUsers = ref(false)
+const membersStatus = ref('')
 const page = ref(1)
 const limit = ref(10)
 const totalUsers = ref(0)
 const totalPages = ref(1)
+
+const summary = ref({
+  totalMembers: 0,
+  activePages: 0,
+  storageUsedGb: 0,
+  storageLimitGb: 50,
+  storagePercent: 0,
+})
+
+const workspaceName = ref('')
+const workspaceLoading = ref(false)
+const workspaceSaving = ref(false)
+const workspaceStatus = ref('')
+
 const deletingUserId = ref('')
 const pendingDeleteUser = ref(null)
+
 const viewingUserId = ref('')
 const detailLoading = ref(false)
 const detailStatus = ref('')
 const selectedUserDetail = ref(null)
 
+const createMemberOpen = ref(false)
+const creatingMember = ref(false)
+const createMemberForm = ref({
+  name: '',
+  email: '',
+  role: 'USER',
+})
+
 const currentUserId = computed(() => currentUser.value?.id || '')
-const canPrevPage = computed(() => page.value > 1 && !loading.value)
-const canNextPage = computed(() => page.value < totalPages.value && !loading.value)
+const canPrevPage = computed(() => page.value > 1 && !loadingUsers.value)
+const canNextPage = computed(() => page.value < totalPages.value && !loadingUsers.value)
+
+const filteredUsers = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return users.value
+  return users.value.filter((user) => {
+    const name = String(user?.name || '').toLowerCase()
+    const email = String(user?.email || '').toLowerCase()
+    const role = String(user?.role || '').toLowerCase()
+    return name.includes(query) || email.includes(query) || role.includes(query)
+  })
+})
+
+const recentUsers = computed(() => filteredUsers.value.slice(0, 5))
+
+const totalMembersDisplay = computed(() => new Intl.NumberFormat().format(totalUsers.value || 0))
+const activePagesEstimate = computed(() => new Intl.NumberFormat().format(summary.value.activePages || 0))
+const storageUsedGb = computed(() => Number(summary.value.storageUsedGb || 0))
+const storageLimitGb = computed(() => Number(summary.value.storageLimitGb || 50))
+const storagePercent = computed(() => Math.min(100, Number(summary.value.storagePercent || 0)))
+
+const headerTitle = computed(() => {
+  if (navActive.value === 'members') return 'Members'
+  if (navActive.value === 'settings') return 'Settings'
+  if (navActive.value === 'billing') return 'Billing'
+  if (navActive.value === 'security') return 'Security'
+  if (navActive.value === 'help') return 'Help Center'
+  return 'Overview'
+})
+
+const headerSubtitle = computed(() => {
+  if (navActive.value === 'members') return 'Manage user accounts and permissions.'
+  if (navActive.value === 'settings') return 'Configure workspace basics.'
+  if (navActive.value === 'billing') return 'Billing module is ready for integration.'
+  if (navActive.value === 'security') return 'Security module is ready for integration.'
+  if (navActive.value === 'help') return 'Help center module is ready for integration.'
+  return 'Workspace health and activity at a glance.'
+})
+
+function authHeader(extra = {}) {
+  const token = getAccessToken()
+  return {
+    ...extra,
+    Authorization: `Bearer ${token}`,
+  }
+}
 
 async function fetchUsers(requestedPage = page.value) {
-  loading.value = true
-  status.value = 'Loading users...'
+  loadingUsers.value = true
+  membersStatus.value = 'Loading users...'
 
   try {
-    const token = getAccessToken()
     const safePage = Math.max(1, Number(requestedPage) || 1)
     const params = new URLSearchParams({
       page: String(safePage),
       limit: String(limit.value),
     })
+
     const res = await fetch(`/api/users?${params.toString()}`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: authHeader(),
     })
 
-    const payload = await res.json()
+    const payload = await res.json().catch(() => ({}))
     if (!res.ok) {
-      status.value = payload.message || 'Failed to load users'
+      membersStatus.value = payload.message || 'Failed to load users'
       return
     }
 
@@ -58,22 +127,104 @@ async function fetchUsers(requestedPage = page.value) {
     totalPages.value = Math.max(1, Number(pagination.totalPages) || 1)
 
     if (totalUsers.value === 0) {
-      status.value = 'No users found'
+      membersStatus.value = 'No users found'
       return
     }
 
     const start = (page.value - 1) * limit.value + 1
     const end = Math.min(page.value * limit.value, totalUsers.value)
-    status.value = `Showing ${start}-${end} of ${totalUsers.value} users`
+    membersStatus.value = `Showing ${start}-${end} of ${totalUsers.value} users`
   } catch {
-    status.value = 'Failed to load users'
+    membersStatus.value = 'Failed to load users'
   } finally {
-    loading.value = false
+    loadingUsers.value = false
+  }
+}
+
+async function fetchSummary() {
+  try {
+    const res = await fetch('/api/users/summary', {
+      method: 'GET',
+      headers: authHeader(),
+    })
+
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok) return
+
+    summary.value = {
+      totalMembers: Number(payload?.data?.totalMembers || totalUsers.value || 0),
+      activePages: Number(payload?.data?.activePages || 0),
+      storageUsedGb: Number(payload?.data?.storageUsedGb || 0),
+      storageLimitGb: Number(payload?.data?.storageLimitGb || 50),
+      storagePercent: Number(payload?.data?.storagePercent || 0),
+    }
+  } catch {
+    // Keep existing values.
+  }
+}
+
+async function fetchWorkspaceSettings() {
+  workspaceLoading.value = true
+  workspaceStatus.value = ''
+
+  try {
+    const res = await fetch('/api/users/workspace-settings', {
+      method: 'GET',
+      headers: authHeader(),
+    })
+
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      workspaceStatus.value = payload.message || 'Failed to load workspace settings'
+      return
+    }
+
+    workspaceName.value = String(payload?.data?.name || '').trim()
+  } catch {
+    workspaceStatus.value = 'Failed to load workspace settings'
+  } finally {
+    workspaceLoading.value = false
+  }
+}
+
+async function saveWorkspaceSettings() {
+  const trimmed = workspaceName.value.trim()
+  if (!trimmed) {
+    workspaceStatus.value = 'Workspace name is required'
+    return
+  }
+  if (trimmed.length > 80) {
+    workspaceStatus.value = 'Workspace name must be 80 characters or fewer'
+    return
+  }
+
+  workspaceSaving.value = true
+  workspaceStatus.value = 'Saving...'
+
+  try {
+    const res = await fetch('/api/users/workspace-settings', {
+      method: 'PUT',
+      headers: authHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ name: trimmed }),
+    })
+
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      workspaceStatus.value = payload.message || 'Failed to save settings'
+      return
+    }
+
+    workspaceName.value = String(payload?.data?.name || trimmed)
+    workspaceStatus.value = 'Settings saved'
+  } catch {
+    workspaceStatus.value = 'Failed to save settings'
+  } finally {
+    workspaceSaving.value = false
   }
 }
 
 async function goToPage(nextPage) {
-  if (loading.value) return
+  if (loadingUsers.value) return
   if (nextPage < 1 || nextPage > totalPages.value) return
   await fetchUsers(nextPage)
 }
@@ -88,6 +239,129 @@ function formatDate(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'N/A'
   return date.toLocaleString()
+}
+
+function formatRelativeTime(value) {
+  if (!value) return 'N/A'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'N/A'
+
+  const diffMs = Date.now() - date.getTime()
+  if (diffMs < 60_000) return 'Just now'
+  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)} min ago`
+  if (diffMs < 86_400_000) return `${Math.floor(diffMs / 3_600_000)} hr ago`
+  if (diffMs < 172_800_000) return 'Yesterday'
+  return `${Math.floor(diffMs / 86_400_000)} days ago`
+}
+
+function roleLabel(role) {
+  if (role === 'ADMIN') return 'Admin'
+  return 'Member'
+}
+
+function getInitials(user) {
+  const text = String(user?.name || user?.email || 'U')
+  const parts = text.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  return parts.map((p) => p[0]?.toUpperCase() || '').join('') || 'U'
+}
+
+function selectTab(tab) {
+  navActive.value = tab
+}
+
+function openCreateMemberModal() {
+  createMemberForm.value = { name: '', email: '', role: 'USER' }
+  createMemberOpen.value = true
+}
+
+function closeCreateMemberModal() {
+  if (creatingMember.value) return
+  createMemberOpen.value = false
+}
+
+async function createMember() {
+  const email = createMemberForm.value.email.trim().toLowerCase()
+  const name = createMemberForm.value.name.trim()
+  const role = createMemberForm.value.role === 'ADMIN' ? 'ADMIN' : 'USER'
+
+  if (!email || !email.includes('@')) {
+    membersStatus.value = 'Please enter a valid member email'
+    return
+  }
+
+  creatingMember.value = true
+  membersStatus.value = 'Creating member...'
+
+  try {
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: authHeader({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ email, name: name || undefined, role }),
+    })
+
+    const payload = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      membersStatus.value = payload.message || 'Failed to create member'
+      return
+    }
+
+    closeCreateMemberModal()
+    await Promise.all([fetchUsers(1), fetchSummary()])
+    membersStatus.value = `Member ${email} created`
+  } catch {
+    membersStatus.value = 'Failed to create member'
+  } finally {
+    creatingMember.value = false
+  }
+}
+
+function openDeleteDialog(user) {
+  if (!user || !user.id || user.id === currentUserId.value) {
+    membersStatus.value = 'You cannot delete your own account from admin'
+    return
+  }
+  pendingDeleteUser.value = user
+}
+
+function closeDeleteDialog() {
+  pendingDeleteUser.value = null
+}
+
+async function confirmDeleteUser() {
+  const userId = pendingDeleteUser.value?.id
+  if (!userId || userId === currentUserId.value) {
+    membersStatus.value = 'You cannot delete your own account from admin'
+    closeDeleteDialog()
+    return
+  }
+
+  deletingUserId.value = userId
+  closeDeleteDialog()
+  membersStatus.value = 'Deleting user...'
+
+  try {
+    const res = await fetch(`/api/users/${userId}`, {
+      method: 'DELETE',
+      headers: authHeader(),
+    })
+
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}))
+      membersStatus.value = payload.message || 'Failed to delete user'
+      return
+    }
+
+    await fetchUsers(page.value)
+    if (users.value.length === 0 && page.value > 1) {
+      await fetchUsers(page.value - 1)
+    }
+    await fetchSummary()
+    membersStatus.value = 'User deleted'
+  } catch {
+    membersStatus.value = 'Failed to delete user'
+  } finally {
+    deletingUserId.value = ''
+  }
 }
 
 function closeDetailsDialog() {
@@ -106,12 +380,9 @@ async function openDetailsDialog(user) {
   selectedUserDetail.value = null
 
   try {
-    const token = getAccessToken()
     const res = await fetch(`/api/users/${user.id}`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: authHeader(),
     })
 
     const payload = await res.json().catch(() => ({}))
@@ -129,55 +400,9 @@ async function openDetailsDialog(user) {
   }
 }
 
-function openDeleteDialog(user) {
-  if (!user || !user.id || user.id === currentUserId.value) {
-    status.value = 'You cannot delete your own account from admin.'
-    return
-  }
-  pendingDeleteUser.value = user
-}
-
-function closeDeleteDialog() {
-  pendingDeleteUser.value = null
-}
-
-async function confirmDeleteUser() {
-  const userId = pendingDeleteUser.value?.id
-  if (!userId || userId === currentUserId.value) {
-    status.value = 'You cannot delete your own account from admin.'
-    closeDeleteDialog()
-    return
-  }
-
-  deletingUserId.value = userId
-  closeDeleteDialog()
-  status.value = 'Deleting user...'
-
-  try {
-    const token = getAccessToken()
-    const res = await fetch(`/api/users/${userId}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!res.ok) {
-      const payload = await res.json().catch(() => ({}))
-      status.value = payload.message || 'Failed to delete user'
-      return
-    }
-
-    await fetchUsers(page.value)
-    if (users.value.length === 0 && page.value > 1) {
-      await fetchUsers(page.value - 1)
-    }
-    status.value = `User deleted. ${status.value}`
-  } catch {
-    status.value = 'Failed to delete user'
-  } finally {
-    deletingUserId.value = ''
-  }
+async function handleLogout() {
+  await logout()
+  router.replace('/login')
 }
 
 onMounted(async () => {
@@ -193,101 +418,264 @@ onMounted(async () => {
     return
   }
 
-  fetchUsers()
+  await Promise.all([fetchUsers(), fetchSummary(), fetchWorkspaceSettings()])
 })
 </script>
 
 <template>
-  <main class="mx-auto w-full max-w-5xl p-5">
-    <section class="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-xl font-semibold text-neutral-900">Admin Users</h1>
-          <p class="text-sm text-neutral-500">Manage user accounts</p>
+  <main class="h-screen overflow-hidden bg-slate-100">
+    <div class="grid h-screen grid-cols-1 lg:grid-cols-[260px_1fr]">
+      <aside class="h-screen border-r border-slate-200 bg-white px-6 py-6">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-sm font-semibold text-white">A</div>
+          <div class="min-w-0">
+            <p class="truncate text-base font-semibold text-slate-900">{{ workspaceName || 'Workspace' }}</p>
+            <p class="text-xs text-slate-500">Admin Dashboard</p>
+          </div>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="inline-flex items-center gap-2 text-xs font-medium text-neutral-600">
-            Per page
-            <select
-              v-model.number="limit"
-              class="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700"
-              :disabled="loading"
-              @change="onLimitChange"
-            >
-              <option :value="5">5</option>
-              <option :value="10">10</option>
-              <option :value="20">20</option>
-              <option :value="50">50</option>
-            </select>
-          </label>
-          <BaseButton variant="secondary" :disabled="loading" @click="fetchUsers(page)">Reload</BaseButton>
+
+        <nav class="mt-8 space-y-1">
+          <button
+            type="button"
+            class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium"
+            :class="navActive === 'overview' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'"
+            @click="selectTab('overview')"
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium"
+            :class="navActive === 'members' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'"
+            @click="selectTab('members')"
+          >
+            Members
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium"
+            :class="navActive === 'settings' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'"
+            @click="selectTab('settings')"
+          >
+            Settings
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium"
+            :class="navActive === 'billing' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'"
+            @click="selectTab('billing')"
+          >
+            Billing
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium"
+            :class="navActive === 'security' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'"
+            @click="selectTab('security')"
+          >
+            Security
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium"
+            :class="navActive === 'help' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'"
+            @click="selectTab('help')"
+          >
+            Help Center
+          </button>
+        </nav>
+
+        <div class="mt-8 border-t border-slate-200 pt-4">
+          <BaseButton variant="secondary" class="w-full" @click="handleLogout">Logout</BaseButton>
         </div>
-      </div>
+      </aside>
 
-      <p class="mt-4 text-sm text-neutral-600">{{ status }}</p>
+      <section class="h-screen overflow-y-auto">
+        <header class="sticky top-0 z-10 border-b border-slate-200 bg-white px-8 py-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 class="text-2xl font-semibold text-slate-900">{{ headerTitle }}</h1>
+              <p class="mt-1 text-sm text-slate-500">{{ headerSubtitle }}</p>
+            </div>
+            <div v-if="navActive === 'members'" class="flex flex-wrap items-center gap-2">
+              <input
+                v-model.trim="searchQuery"
+                type="search"
+                placeholder="Search members"
+                class="w-64 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+              />
+              <BaseButton variant="secondary" :disabled="loadingUsers" @click="fetchUsers(page)">Reload</BaseButton>
+              <BaseButton @click="openCreateMemberModal">Add Member</BaseButton>
+            </div>
+          </div>
+        </header>
 
-      <div class="mt-4 overflow-x-auto rounded-xl border border-neutral-200">
-        <table class="min-w-full divide-y divide-neutral-200 text-sm">
-          <thead class="bg-neutral-50">
-            <tr>
-              <th class="px-4 py-3 text-left font-semibold text-neutral-700">Name</th>
-              <th class="px-4 py-3 text-left font-semibold text-neutral-700">Email</th>
-              <th class="px-4 py-3 text-left font-semibold text-neutral-700">Role</th>
-              <th class="px-4 py-3 text-left font-semibold text-neutral-700">Verified</th>
-              <th class="px-4 py-3 text-left font-semibold text-neutral-700">Created</th>
-              <th class="px-4 py-3 text-right font-semibold text-neutral-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-neutral-100 bg-white">
-            <tr v-for="user in users" :key="user.id">
-              <td class="px-4 py-3 text-neutral-800">{{ user.name || 'Unnamed' }}</td>
-              <td class="px-4 py-3 text-neutral-700">{{ user.email }}</td>
-              <td class="px-4 py-3 text-neutral-700">
-                <span
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-                  :class="user.role === 'ADMIN' ? 'bg-blue-100 text-blue-700' : 'bg-neutral-100 text-neutral-700'"
-                >
-                  {{ user.role || 'USER' }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-neutral-700">{{ user.isEmailVerified ? 'Yes' : 'No' }}</td>
-              <td class="px-4 py-3 text-neutral-700">{{ formatDate(user.createdAt) }}</td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex justify-end gap-2">
-                  <BaseButton
-                    variant="secondary"
-                    class="min-w-20"
-                    :disabled="detailLoading && viewingUserId === user.id"
-                    @click="openDetailsDialog(user)"
-                  >
-                    View
-                  </BaseButton>
-                  <BaseButton
-                    variant="ghost"
-                    class="border-red-200 text-red-600 hover:bg-red-50"
-                    :disabled="deletingUserId === user.id || user.id === currentUserId"
-                    @click="openDeleteDialog(user)"
-                  >
-                    {{ deletingUserId === user.id ? 'Deleting...' : 'Delete' }}
-                  </BaseButton>
+        <div class="px-8 py-6">
+          <section v-if="navActive === 'overview'" class="space-y-6">
+            <div class="grid gap-4 md:grid-cols-3">
+              <article class="rounded-xl border border-slate-200 bg-white p-5">
+                <p class="text-sm text-slate-500">Total Members</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900">{{ totalMembersDisplay }}</p>
+              </article>
+              <article class="rounded-xl border border-slate-200 bg-white p-5">
+                <p class="text-sm text-slate-500">Active (7 days)</p>
+                <p class="mt-2 text-3xl font-semibold text-slate-900">{{ activePagesEstimate }}</p>
+              </article>
+              <article class="rounded-xl border border-slate-200 bg-white p-5">
+                <p class="text-sm text-slate-500">Storage</p>
+                <p class="mt-2 text-2xl font-semibold text-slate-900">{{ storageUsedGb }} GB / {{ storageLimitGb }} GB</p>
+                <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div class="h-full rounded-full bg-blue-600" :style="{ width: `${storagePercent}%` }" />
                 </div>
-              </td>
-            </tr>
-            <tr v-if="!loading && users.length === 0">
-              <td colspan="6" class="px-4 py-6 text-center text-neutral-500">No users found</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              </article>
+            </div>
 
-      <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <p class="text-xs text-neutral-500">Page {{ page }} of {{ totalPages }}</p>
-        <div class="flex items-center gap-2">
-          <BaseButton variant="secondary" :disabled="!canPrevPage" @click="goToPage(page - 1)">Previous</BaseButton>
-          <BaseButton variant="secondary" :disabled="!canNextPage" @click="goToPage(page + 1)">Next</BaseButton>
+            <article class="rounded-xl border border-slate-200 bg-white">
+              <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h2 class="text-lg font-semibold text-slate-900">Recent Members</h2>
+                <BaseButton variant="secondary" @click="selectTab('members')">Manage</BaseButton>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-50 text-left text-slate-500">
+                    <tr>
+                      <th class="px-5 py-3 font-medium">Name</th>
+                      <th class="px-5 py-3 font-medium">Email</th>
+                      <th class="px-5 py-3 font-medium">Role</th>
+                      <th class="px-5 py-3 font-medium">Updated</th>
+                      <th class="px-5 py-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    <tr v-for="user in recentUsers" :key="user.id">
+                      <td class="px-5 py-3 text-slate-900">{{ user.name || 'Unnamed' }}</td>
+                      <td class="px-5 py-3 text-slate-600">{{ user.email }}</td>
+                      <td class="px-5 py-3 text-slate-600">{{ roleLabel(user.role) }}</td>
+                      <td class="px-5 py-3 text-slate-600">{{ formatRelativeTime(user.updatedAt || user.createdAt) }}</td>
+                      <td class="px-5 py-3 text-right">
+                        <BaseButton variant="secondary" @click="openDetailsDialog(user)">View</BaseButton>
+                      </td>
+                    </tr>
+                    <tr v-if="recentUsers.length === 0">
+                      <td colspan="5" class="px-5 py-8 text-center text-slate-500">No members found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section v-if="navActive === 'members'" class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                Per page
+                <select
+                  v-model.number="limit"
+                  class="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm"
+                  :disabled="loadingUsers"
+                  @change="onLimitChange"
+                >
+                  <option :value="5">5</option>
+                  <option :value="10">10</option>
+                  <option :value="20">20</option>
+                  <option :value="50">50</option>
+                </select>
+              </label>
+              <p class="text-sm text-slate-500">{{ membersStatus }}</p>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-left">
+                  <tr>
+                    <th class="px-5 py-3 font-medium text-slate-500">User</th>
+                    <th class="px-5 py-3 font-medium text-slate-500">Role</th>
+                    <th class="px-5 py-3 font-medium text-slate-500">Email Verified</th>
+                    <th class="px-5 py-3 font-medium text-slate-500">Updated</th>
+                    <th class="px-5 py-3 text-right font-medium text-slate-500">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="user in filteredUsers" :key="user.id">
+                    <td class="px-5 py-3">
+                      <div class="flex items-center gap-3">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+                          {{ getInitials(user) }}
+                        </div>
+                        <div class="min-w-0">
+                          <p class="truncate font-medium text-slate-900">{{ user.name || 'Unnamed' }}</p>
+                          <p class="truncate text-slate-500">{{ user.email }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-5 py-3 text-slate-600">{{ roleLabel(user.role) }}</td>
+                    <td class="px-5 py-3 text-slate-600">{{ user.isEmailVerified ? 'Yes' : 'No' }}</td>
+                    <td class="px-5 py-3 text-slate-600">{{ formatRelativeTime(user.updatedAt || user.createdAt) }}</td>
+                    <td class="px-5 py-3">
+                      <div class="flex justify-end gap-2">
+                        <BaseButton
+                          variant="secondary"
+                          :disabled="detailLoading && viewingUserId === user.id"
+                          @click="openDetailsDialog(user)"
+                        >
+                          View
+                        </BaseButton>
+                        <BaseButton
+                          variant="ghost"
+                          class="border-red-200 text-red-600 hover:bg-red-50"
+                          :disabled="deletingUserId === user.id || user.id === currentUserId"
+                          @click="openDeleteDialog(user)"
+                        >
+                          {{ deletingUserId === user.id ? 'Deleting...' : 'Delete' }}
+                        </BaseButton>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="!loadingUsers && filteredUsers.length === 0">
+                    <td colspan="5" class="px-5 py-8 text-center text-slate-500">No members found</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs text-slate-500">Page {{ page }} of {{ totalPages }}</p>
+              <div class="flex items-center gap-2">
+                <BaseButton variant="secondary" :disabled="!canPrevPage" @click="goToPage(page - 1)">Previous</BaseButton>
+                <BaseButton variant="secondary" :disabled="!canNextPage" @click="goToPage(page + 1)">Next</BaseButton>
+              </div>
+            </div>
+          </section>
+
+          <section v-if="navActive === 'settings'" class="rounded-xl border border-slate-200 bg-white p-6">
+            <div class="max-w-xl">
+              <label class="block text-sm font-medium text-slate-700">Workspace Name</label>
+              <input
+                v-model="workspaceName"
+                :disabled="workspaceLoading || workspaceSaving"
+                type="text"
+                class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800"
+                placeholder="Enter workspace name"
+              />
+              <div class="mt-3 flex items-center justify-between gap-3">
+                <p class="text-sm text-slate-500">{{ workspaceStatus || 'Name appears in the admin sidebar.' }}</p>
+                <BaseButton :disabled="workspaceLoading || workspaceSaving" @click="saveWorkspaceSettings">
+                  {{ workspaceSaving ? 'Saving...' : 'Save' }}
+                </BaseButton>
+              </div>
+            </div>
+          </section>
+
+          <section
+            v-if="navActive === 'billing' || navActive === 'security' || navActive === 'help'"
+            class="rounded-xl border border-slate-200 bg-white p-10 text-center"
+          >
+            <p class="text-lg font-semibold text-slate-800">No content yet</p>
+            <p class="mt-2 text-sm text-slate-500">Ready to add content.</p>
+          </section>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </main>
 
   <BaseModalDialog
@@ -346,6 +734,55 @@ onMounted(async () => {
 
     <template #actions>
       <BaseButton variant="secondary" :disabled="detailLoading" @click="closeDetailsDialog">Close</BaseButton>
+    </template>
+  </BaseModalDialog>
+
+  <BaseModalDialog
+    :open="createMemberOpen"
+    title="Add member"
+    description="Create a user profile from the admin dashboard."
+    max-width-class="max-w-lg"
+    @close="closeCreateMemberModal"
+  >
+    <div class="grid gap-3">
+      <label class="text-sm font-semibold text-neutral-700">
+        Name
+        <input
+          v-model="createMemberForm.name"
+          type="text"
+          class="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800"
+          placeholder="Jane Doe"
+          :disabled="creatingMember"
+        />
+      </label>
+      <label class="text-sm font-semibold text-neutral-700">
+        Email
+        <input
+          v-model="createMemberForm.email"
+          type="email"
+          class="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800"
+          placeholder="jane@example.com"
+          :disabled="creatingMember"
+        />
+      </label>
+      <label class="text-sm font-semibold text-neutral-700">
+        Role
+        <select
+          v-model="createMemberForm.role"
+          class="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800"
+          :disabled="creatingMember"
+        >
+          <option value="USER">Member</option>
+          <option value="ADMIN">Admin</option>
+        </select>
+      </label>
+    </div>
+
+    <template #actions>
+      <BaseButton variant="secondary" :disabled="creatingMember" @click="closeCreateMemberModal">Cancel</BaseButton>
+      <BaseButton :disabled="creatingMember" @click="createMember">
+        {{ creatingMember ? 'Creating...' : 'Create Member' }}
+      </BaseButton>
     </template>
   </BaseModalDialog>
 </template>

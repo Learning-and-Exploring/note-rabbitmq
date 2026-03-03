@@ -1,9 +1,56 @@
 import { prisma } from "../../shared/database";
-import { CreateUserDto } from "./user.model";
+import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
+import { promises as fs } from "fs";
+import path from "path";
+import {
+  AdminCreateUserDto,
+  CreateUserDto,
+  WorkspaceSettingsDto,
+} from "./user.model";
 import {
   publishUserCreated,
   publishUserEmailVerified,
 } from "../../events/publishers/user.publisher";
+
+const defaultWorkspaceSettings: WorkspaceSettingsDto = {
+  name: "",
+  updatedAt: new Date().toISOString(),
+};
+const workspaceSettingsPath = path.resolve(
+  process.cwd(),
+  "data",
+  "workspace-settings.json",
+);
+
+async function readWorkspaceSettings(): Promise<WorkspaceSettingsDto> {
+  try {
+    const raw = await fs.readFile(workspaceSettingsPath, "utf-8");
+    const parsed = JSON.parse(raw);
+
+    const name = String(parsed?.name || "").trim();
+    const updatedAt = String(parsed?.updatedAt || "").trim();
+    if (!name || !updatedAt) {
+      return { ...defaultWorkspaceSettings };
+    }
+
+    return { name, updatedAt };
+  } catch {
+    return { ...defaultWorkspaceSettings };
+  }
+}
+
+async function writeWorkspaceSettings(
+  settings: WorkspaceSettingsDto,
+): Promise<void> {
+  const dir = path.dirname(workspaceSettingsPath);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(
+    workspaceSettingsPath,
+    JSON.stringify(settings, null, 2),
+    "utf-8",
+  );
+}
 
 export const userService = {
   /**
@@ -161,6 +208,130 @@ export const userService = {
   },
 
   async deleteUser(id: string) {
-    await prisma.user.delete({ where: { id } });
+    try {
+      await prisma.user.delete({ where: { id } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new Error("User not found.");
+      }
+      throw error;
+    }
+  },
+
+  async createUserByAdmin(dto: AdminCreateUserDto) {
+    const email = String(dto.email || "").trim().toLowerCase();
+    const name = String(dto.name || "").trim() || null;
+    const role = dto.role === "ADMIN" ? "ADMIN" : "USER";
+
+    if (!email || !email.includes("@")) {
+      throw new Error("Valid email is required.");
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new Error("A user with this email already exists.");
+    }
+
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          id: randomUUID(),
+          email,
+          name,
+          role,
+          isEmailVerified: false,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          avatarUrl: true,
+          isEmailVerified: true,
+          emailVerifiedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new Error("A user with this email already exists.");
+      }
+      throw error;
+    }
+
+    return user;
+  },
+
+  async getWorkspaceSettings() {
+    return readWorkspaceSettings();
+  },
+
+  async updateWorkspaceSettings(nameInput: string) {
+    const name = String(nameInput || "").trim();
+    if (!name) {
+      throw new Error("Workspace name is required.");
+    }
+    if (name.length > 80) {
+      throw new Error("Workspace name must be 80 characters or fewer.");
+    }
+
+    const settings: WorkspaceSettingsDto = {
+      name,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeWorkspaceSettings(settings);
+    return settings;
+  },
+
+  async getSummary() {
+    const now = Date.now();
+    const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const users = await prisma.user.findMany({
+      select: {
+        email: true,
+        name: true,
+        avatarUrl: true,
+        updatedAt: true,
+      },
+    });
+
+    const totalMembers = users.length;
+    const activePages = users.filter((u) => u.updatedAt >= sevenDaysAgo).length;
+
+    const storageBytes = users.reduce((total, user) => {
+      const emailBytes = Buffer.byteLength(user.email || "", "utf-8");
+      const nameBytes = Buffer.byteLength(user.name || "", "utf-8");
+      const avatarBytes = Buffer.byteLength(user.avatarUrl || "", "utf-8");
+      return total + emailBytes + nameBytes + avatarBytes;
+    }, 0);
+
+    const storageUsedGb = Number((storageBytes / (1024 ** 3)).toFixed(4));
+    const storageLimitGb = Math.max(
+      1,
+      Number(process.env.WORKSPACE_STORAGE_LIMIT_GB || 50),
+    );
+
+    return {
+      totalMembers,
+      activePages,
+      storageUsedGb,
+      storageLimitGb,
+      storagePercent: Math.min(
+        100,
+        Math.round((storageUsedGb / storageLimitGb) * 100),
+      ),
+    };
   },
 };
