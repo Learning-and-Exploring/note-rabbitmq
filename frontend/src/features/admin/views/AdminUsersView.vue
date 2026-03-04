@@ -42,6 +42,7 @@ const workspaceStatus = ref('')
 
 const deletingUserId = ref('')
 const pendingDeleteUser = ref(null)
+const pendingVerifyUser = ref(null)
 const verifyingUserId = ref('')
 
 const viewingUserId = ref('')
@@ -372,6 +373,28 @@ async function confirmDeleteUser() {
 }
 
 async function verifyUserEmail(user) {
+  const userId = user?.id
+  if (!userId) return
+  if (user?.isEmailVerified) {
+    membersStatus.value = 'Email is already verified'
+    return
+  }
+  pendingVerifyUser.value = user
+}
+
+function closeVerifyDialog() {
+  if (Boolean(verifyingUserId.value)) return
+  pendingVerifyUser.value = null
+}
+
+async function confirmVerifyUser() {
+  const user = pendingVerifyUser.value
+  if (!user) return
+  await verifyUserEmailNow(user)
+  pendingVerifyUser.value = null
+}
+
+async function verifyUserEmailNow(user) {
   const userId = user?.id
   if (!userId) return
   if (user?.isEmailVerified) {
@@ -760,6 +783,23 @@ onMounted(async () => {
       <BaseButton variant="secondary" @click="closeDeleteDialog">Cancel</BaseButton>
       <BaseButton class="bg-red-600 hover:bg-red-700" :disabled="Boolean(deletingUserId)" @click="confirmDeleteUser">
         Delete
+      </BaseButton>
+    </template>
+  </BaseModalDialog>
+
+  <BaseModalDialog
+    :open="Boolean(pendingVerifyUser)"
+    title="Verify user email?"
+    description="This will mark the user's email as verified."
+    @close="closeVerifyDialog"
+  >
+    <p class="truncate text-sm text-neutral-700">
+      {{ pendingVerifyUser?.name || pendingVerifyUser?.email || 'Selected user' }}
+    </p>
+    <template #actions>
+      <BaseButton variant="secondary" :disabled="Boolean(verifyingUserId)" @click="closeVerifyDialog">Cancel</BaseButton>
+      <BaseButton :disabled="Boolean(verifyingUserId)" @click="confirmVerifyUser">
+        {{ Boolean(verifyingUserId) ? 'Verifying...' : 'Confirm Verify' }}
       </BaseButton>
     </template>
   </BaseModalDialog>

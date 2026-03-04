@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 
 const router = useRouter()
 const uiError = ref('')
+const showLoginPassword = ref(false)
 const {
   authStatus,
   authMode,
@@ -134,7 +135,47 @@ async function handleResendOtp() {
 
       <div v-else class="grid gap-2.5">
         <input v-model="loginEmail" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Email" type="email" />
-        <input v-model="loginPassword" class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm outline-none focus:border-blue-400" placeholder="Password" type="password" />
+        <div class="relative">
+          <input
+            v-model="loginPassword"
+            class="w-full rounded-lg border border-neutral-300 px-3 py-2.5 pr-10 text-sm outline-none focus:border-blue-400"
+            placeholder="Password"
+            :type="showLoginPassword ? 'text' : 'password'"
+          />
+          <button
+            type="button"
+            class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-500 hover:text-neutral-700"
+            :aria-label="showLoginPassword ? 'Hide password' : 'Show password'"
+            @click="showLoginPassword = !showLoginPassword"
+          >
+            <svg
+              v-if="showLoginPassword"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              class="h-5 w-5"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58a2 2 0 002.83 2.83" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.88 5.09A10.45 10.45 0 0112 4c5 0 9 4 10 8a11.7 11.7 0 01-4.11 5.94" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.61 6.61A11.72 11.72 0 002 12c1 4 5 8 10 8a10.45 10.45 0 005.09-1.32" />
+            </svg>
+            <svg
+              v-else
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              class="h-5 w-5"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s4-8 10-8 10 8 10 8-4 8-10 8-10-8-10-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
         <BaseButton size="md" @click="handleLogin">Login</BaseButton>
       </div>
 
