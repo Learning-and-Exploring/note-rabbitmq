@@ -112,13 +112,39 @@ Notes:
 
 | Component      | Container/Service | Host Port | Internal Port |
 | --- | --- | --- | --- |
-| API Gateway    | `api-gateway` | `3000` | `3000` |
+| Edge Nginx     | `edge-nginx` | `8080` | `80` |
+| API Gateway    | `api-gateway` | `-` (not published) | `3000` |
 | Auth Service   | `auth-service` | `3001` | `3001` |
 | User Service   | `user-service` | `3002` | `3002` |
 | Note Service   | `note-service` | `3003` | `3003` |
 | RabbitMQ AMQP  | `rabbitmq` | `5672` | `5672` |
 | RabbitMQ UI    | `rabbitmq` | `15672` | `15672` |
 | PostgreSQL DBs | `postgres-db` | `5433` | `5432` |
+
+## Dev Request Routing (`:5173` vs `:8080`)
+
+In development, there are two reverse-proxy hops before a request reaches services:
+
+1. Frontend dev server (Vite) on `http://localhost:5173`
+2. Edge Nginx on `http://localhost:8080`
+
+How login works in browser:
+
+1. You open `http://localhost:5173/login` (this is the UI route, not backend).
+2. Frontend code sends `POST /auth-api/auths/login` (relative URL).
+3. Vite proxy forwards `/auth-api/*` to `http://localhost:8080` (configured in `frontend/vite.config.ts`).
+4. Edge Nginx forwards to `api-gateway:3000`.
+5. API Gateway proxies `/auths/login` to `auth-service:3001`.
+
+So the request chain is:
+
+`Browser -> Vite (:5173) -> Edge Nginx (:8080) -> API Gateway (:3000) -> auth-service (:3001)`
+
+Notes:
+
+- `http://localhost:8080/api/auths/login` is a backend endpoint entrypoint through edge-nginx.
+- `http://localhost:5173/login` is a frontend page.
+- `http://localhost:3000` is not directly reachable from host in current `docker-compose.yml` because gateway uses `expose`, not `ports`.
 
 ## API Endpoints (Current)
 
