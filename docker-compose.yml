@@ -136,6 +136,11 @@ services:
       USER_SERVICE_URL: http://user-service:3002
       NOTE_SERVICE_URL: http://note-service:3003
       ACCESS_TOKEN_SECRET: super_secret_access_key_change_me
+      TRUST_PROXY: 1
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX: 120
+      AUTH_RATE_LIMIT_WINDOW_MS: 600000
+      AUTH_RATE_LIMIT_MAX: 20
     depends_on:
       - auth-service
       - note-service

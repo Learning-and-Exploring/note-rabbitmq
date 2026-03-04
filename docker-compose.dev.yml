@@ -40,6 +40,11 @@ services:
       NODE_ENV: development
       NOTE_SERVICE_URL: http://note-service:3003
       ACCESS_TOKEN_SECRET: super_secret_access_key_change_me
+      TRUST_PROXY: 1
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX: 60
+      AUTH_RATE_LIMIT_WINDOW_MS: 600000
+      AUTH_RATE_LIMIT_MAX: 20
     depends_on:
       - note-service
     volumes:
