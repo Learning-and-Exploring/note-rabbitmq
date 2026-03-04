@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { http, isErrorStatus } from '@/lib/http'
 
 export function useNotes() {
   const notes = ref([])
@@ -79,15 +80,15 @@ export function useNotes() {
 
     status.value = 'Loading notes...'
     try {
-      const res = await fetch(`/api/notes/auth/${encodeURIComponent(authId.trim())}`, {
+      const res = await http.get(`/api/notes/auth/${encodeURIComponent(authId.trim())}`, {
         headers: authHeaders(),
       })
-      const payload = await res.json()
+      const payload = res.data || {}
       if (res.status === 401) {
         handleUnauthorized(payload)
         return
       }
-      if (!res.ok) {
+      if (isErrorStatus(res.status)) {
         status.value = payload.message || 'Failed to load notes'
         return
       }
@@ -102,15 +103,15 @@ export function useNotes() {
   async function selectNote(id) {
     status.value = 'Loading note...'
     try {
-      const res = await fetch(`/api/notes/${encodeURIComponent(id)}`, {
+      const res = await http.get(`/api/notes/${encodeURIComponent(id)}`, {
         headers: authHeaders(),
       })
-      const payload = await res.json()
+      const payload = res.data || {}
       if (res.status === 401) {
         handleUnauthorized(payload)
         return
       }
-      if (!res.ok) {
+      if (isErrorStatus(res.status)) {
         status.value = payload.message || 'Failed to load note'
         return
       }
@@ -150,17 +151,16 @@ export function useNotes() {
             content: content.value,
           }
 
-      const res = await fetch(endpoint, {
-        method: isUpdate ? 'PATCH' : 'POST',
+      const request = isUpdate ? http.patch : http.post
+      const res = await request(endpoint, body, {
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(body),
       })
-      const payload = await res.json()
+      const payload = res.data || {}
       if (res.status === 401) {
         handleUnauthorized(payload)
         return
       }
-      if (!res.ok) {
+      if (isErrorStatus(res.status)) {
         status.value = payload.message || 'Save failed'
         return
       }
@@ -192,24 +192,17 @@ export function useNotes() {
     deletingNoteId.value = id
     status.value = 'Deleting...'
     try {
-      const res = await fetch(`/api/notes/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
+      const res = await http.delete(`/api/notes/${encodeURIComponent(id)}`, {
         headers: authHeaders(),
       })
-
-      let payload = {}
-      try {
-        payload = await res.json()
-      } catch {
-        payload = {}
-      }
+      const payload = res.data || {}
 
       if (res.status === 401) {
         handleUnauthorized(payload)
         return
       }
 
-      if (!res.ok) {
+      if (isErrorStatus(res.status)) {
         status.value = payload.message || 'Delete failed'
         return
       }
@@ -248,18 +241,16 @@ export function useNotes() {
     sharingNoteId.value = id
     status.value = 'Creating share link...'
     try {
-      const res = await fetch(`/api/notes/${encodeURIComponent(id)}/share`, {
-        method: 'POST',
+      const res = await http.post(`/api/notes/${encodeURIComponent(id)}/share`, { authId: authId.trim() }, {
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ authId: authId.trim() }),
       })
 
-      const payload = await res.json()
+      const payload = res.data || {}
       if (res.status === 401) {
         handleUnauthorized(payload)
         return ''
       }
-      if (!res.ok) {
+      if (isErrorStatus(res.status)) {
         status.value = payload.message || 'Share failed'
         return ''
       }
@@ -291,18 +282,17 @@ export function useNotes() {
     sharingNoteId.value = id
     status.value = 'Disabling share...'
     try {
-      const res = await fetch(`/api/notes/${encodeURIComponent(id)}/share`, {
-        method: 'DELETE',
+      const res = await http.delete(`/api/notes/${encodeURIComponent(id)}/share`, {
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ authId: authId.trim() }),
+        data: { authId: authId.trim() },
       })
 
-      const payload = await res.json()
+      const payload = res.data || {}
       if (res.status === 401) {
         handleUnauthorized(payload)
         return false
       }
-      if (!res.ok) {
+      if (isErrorStatus(res.status)) {
         status.value = payload.message || 'Disable share failed'
         return false
       }

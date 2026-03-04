@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { http, isErrorStatus } from '@/lib/http'
 
 const route = useRoute()
 const token = computed(() => String(route.params.token || ''))
@@ -101,10 +102,10 @@ async function loadPublicNote() {
   error.value = ''
 
   try {
-    const res = await fetch(`/api/public/notes/${encodeURIComponent(token.value)}`)
-    const payload = await res.json()
+    const res = await http.get(`/api/public/notes/${encodeURIComponent(token.value)}`)
+    const payload = res.data || {}
 
-    if (!res.ok) {
+    if (isErrorStatus(res.status)) {
       error.value = payload.message || 'Shared note not found.'
       return
     }

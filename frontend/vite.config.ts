@@ -16,17 +16,14 @@ export default defineConfig({
   server: {
     proxy: {
       // Route all frontend API calls through API gateway.
-      // /auth-api/* -> /auths/* and /api/* -> /notes/*
-      // Gateway default: http://localhost:3000
+      // Default points to edge-nginx (docker-compose) on :8080.
       '/api': {
-        target: process.env.VITE_GATEWAY_BASE_URL || 'http://localhost:3000',
+        target: process.env.VITE_GATEWAY_BASE_URL || 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/auth-api': {
-        target: process.env.VITE_GATEWAY_BASE_URL || 'http://localhost:3000',
+        target: process.env.VITE_GATEWAY_BASE_URL || 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/auth-api/, ''),
       },
     },
   },

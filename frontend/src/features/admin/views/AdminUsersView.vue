@@ -11,6 +11,7 @@ import {
 import BaseButton from '@/shared/components/base/BaseButton.vue'
 import BaseModalDialog from '@/shared/components/base/BaseModalDialog.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { http, isErrorStatus } from '@/lib/http'
 
 const router = useRouter()
 const { currentUser, isAuthenticated, isAdmin, restoreSession, getAccessToken, logout } = useAuth()
@@ -117,13 +118,12 @@ async function fetchUsers(requestedPage = page.value) {
       limit: String(limit.value),
     })
 
-    const res = await fetch(`/api/users?${params.toString()}`, {
-      method: 'GET',
+    const res = await http.get(`/api/users?${params.toString()}`, {
       headers: authHeader(),
     })
 
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       membersStatus.value = payload.message || 'Failed to load users'
       return
     }
@@ -152,13 +152,12 @@ async function fetchUsers(requestedPage = page.value) {
 
 async function fetchSummary() {
   try {
-    const res = await fetch('/api/users/summary', {
-      method: 'GET',
+    const res = await http.get('/api/users/summary', {
       headers: authHeader(),
     })
 
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) return
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) return
 
     summary.value = {
       totalMembers: Number(payload?.data?.totalMembers || totalUsers.value || 0),
@@ -177,13 +176,12 @@ async function fetchWorkspaceSettings() {
   workspaceStatus.value = ''
 
   try {
-    const res = await fetch('/api/users/workspace-settings', {
-      method: 'GET',
+    const res = await http.get('/api/users/workspace-settings', {
       headers: authHeader(),
     })
 
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       workspaceStatus.value = payload.message || 'Failed to load workspace settings'
       return
     }
@@ -211,14 +209,12 @@ async function saveWorkspaceSettings() {
   workspaceStatus.value = 'Saving...'
 
   try {
-    const res = await fetch('/api/users/workspace-settings', {
-      method: 'PUT',
+    const res = await http.put('/api/users/workspace-settings', { name: trimmed }, {
       headers: authHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ name: trimmed }),
     })
 
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       workspaceStatus.value = payload.message || 'Failed to save settings'
       return
     }
@@ -307,14 +303,12 @@ async function createMember() {
   membersStatus.value = 'Creating member...'
 
   try {
-    const res = await fetch('/api/users', {
-      method: 'POST',
+    const res = await http.post('/api/users', { email, password, name: name || undefined, role }, {
       headers: authHeader({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ email, password, name: name || undefined, role }),
     })
 
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       membersStatus.value = payload.message || 'Failed to create member'
       return
     }
@@ -354,13 +348,12 @@ async function confirmDeleteUser() {
   membersStatus.value = 'Deleting user...'
 
   try {
-    const res = await fetch(`/api/users/${userId}`, {
-      method: 'DELETE',
+    const res = await http.delete(`/api/users/${userId}`, {
       headers: authHeader(),
     })
 
-    if (!res.ok) {
-      const payload = await res.json().catch(() => ({}))
+    if (isErrorStatus(res.status)) {
+      const payload = res.data || {}
       membersStatus.value = payload.message || 'Failed to delete user'
       return
     }
@@ -390,13 +383,12 @@ async function verifyUserEmail(user) {
   membersStatus.value = 'Verifying user email...'
 
   try {
-    const res = await fetch(`/auth-api/auths/${userId}/verify-email`, {
-      method: 'PATCH',
+    const res = await http.patch(`/auth-api/auths/${userId}/verify-email`, null, {
       headers: authHeader(),
     })
 
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       membersStatus.value = payload.message || 'Failed to verify email'
       return
     }
@@ -446,13 +438,12 @@ async function openDetailsDialog(user) {
   selectedUserDetail.value = null
 
   try {
-    const res = await fetch(`/api/users/${user.id}`, {
-      method: 'GET',
+    const res = await http.get(`/api/users/${user.id}`, {
       headers: authHeader(),
     })
 
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       detailStatus.value = payload.message || 'Failed to load user details'
       return
     }

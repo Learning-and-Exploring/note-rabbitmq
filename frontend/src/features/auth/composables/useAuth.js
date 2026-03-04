@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { http, isErrorStatus } from '@/lib/http'
 
 const LEGACY_STORAGE_KEY = 'notionui.auth'
 
@@ -58,19 +59,14 @@ async function restoreSession() {
 
   restorePromise = (async () => {
     try {
-      const res = await fetch('/auth-api/auths/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({}),
-      })
+      const res = await http.post('/auth-api/auths/refresh', {})
 
-      if (!res.ok) {
+      if (isErrorStatus(res.status)) {
         clearSession()
         return false
       }
 
-      const payload = await res.json()
+      const payload = res.data || {}
       const auth = payload.data
       accessToken.value = auth.accessToken || ''
       currentUser.value = auth.data || null
@@ -95,17 +91,13 @@ async function restoreSession() {
 async function register() {
   authStatus.value = 'Registering...'
   try {
-    const res = await fetch('/auth-api/auths', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: registerName.value || undefined,
-        email: registerEmail.value,
-        password: registerPassword.value,
-      }),
+    const res = await http.post('/auth-api/auths', {
+      name: registerName.value || undefined,
+      email: registerEmail.value,
+      password: registerPassword.value,
     })
-    const payload = await res.json()
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       authStatus.value = payload.message || 'Register failed'
       return false
     }
@@ -125,16 +117,12 @@ async function register() {
 async function verify() {
   authStatus.value = 'Verifying email...'
   try {
-    const res = await fetch('/auth-api/auths/verify-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: verifyEmail.value,
-        otp: verifyOtp.value,
-      }),
+    const res = await http.post('/auth-api/auths/verify-email', {
+      email: verifyEmail.value,
+      otp: verifyOtp.value,
     })
-    const payload = await res.json()
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       authStatus.value = payload.message || 'Verify failed'
       return false
     }
@@ -153,13 +141,9 @@ async function verify() {
 async function resendOtp() {
   authStatus.value = 'Resending OTP...'
   try {
-    const res = await fetch('/auth-api/auths/resend-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: verifyEmail.value }),
-    })
-    const payload = await res.json()
-    if (!res.ok) {
+    const res = await http.post('/auth-api/auths/resend-otp', { email: verifyEmail.value })
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       authStatus.value = payload.message || 'Resend failed'
       return false
     }
@@ -177,17 +161,12 @@ async function login() {
   clearLegacyStorage()
   authStatus.value = 'Logging in...'
   try {
-    const res = await fetch('/auth-api/auths/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        email: loginEmail.value,
-        password: loginPassword.value,
-      }),
+    const res = await http.post('/auth-api/auths/login', {
+      email: loginEmail.value,
+      password: loginPassword.value,
     })
-    const payload = await res.json()
-    if (!res.ok) {
+    const payload = res.data || {}
+    if (isErrorStatus(res.status)) {
       authStatus.value = payload.message || 'Login failed'
       return false
     }
@@ -209,12 +188,7 @@ async function login() {
 async function logout() {
   authStatus.value = 'Logging out...'
   try {
-    await fetch('/auth-api/auths/logout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({}),
-    })
+    await http.post('/auth-api/auths/logout', {})
   } catch (err) {
     console.error(err)
   }
@@ -241,18 +215,15 @@ async function updateName(name) {
   authStatus.value = 'Updating name...'
 
   try {
-    const res = await fetch(`/auth-api/auths/change-name/${userId}`, {
-      method: 'PATCH',
+    const res = await http.patch(`/auth-api/auths/change-name/${userId}`, { name: trimmedName }, {
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ name: trimmedName }),
     })
 
-    const payload = await res.json().catch(() => ({}))
+    const payload = res.data || {}
 
-    if (!res.ok) {
+    if (isErrorStatus(res.status)) {
       authStatus.value = payload.message || 'Failed to update name'
       return false
     }
